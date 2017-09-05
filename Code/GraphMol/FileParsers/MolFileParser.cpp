@@ -313,8 +313,8 @@ void ParseSGroup2000STYLine(RWMol *mol, const std::string &text,
       errout << "S group " << typ;
       throw MolFileUnhandledFeatureException(errout.str());
     } else {
-      BOOST_LOG(rdWarningLog) << " S group " << typ << " ignored on line "
-                              << line << std::endl;
+      BOOST_LOG(rdWarningLog)
+          << " S group " << typ << " ignored on line " << line << std::endl;
     }
     spos += 4;
   }
@@ -1332,9 +1332,9 @@ Bond *ParseMolFileBondLine(const std::string &text, unsigned int line) {
     case 0:
       type = Bond::UNSPECIFIED;
       res = new Bond;
-      BOOST_LOG(rdWarningLog) << "bond with order 0 found on line " << line
-                              << ". This is not part of the MDL specification."
-                              << std::endl;
+      BOOST_LOG(rdWarningLog)
+          << "bond with order 0 found on line " << line
+          << ". This is not part of the MDL specification." << std::endl;
       break;
     default:
       type = Bond::UNSPECIFIED;
@@ -1374,9 +1374,9 @@ Bond *ParseMolFileBondLine(const std::string &text, unsigned int line) {
         BOND_NULL_QUERY *q;
         q = makeBondNullQuery();
         res->setQuery(q);
-        BOOST_LOG(rdWarningLog) << "unrecognized query bond type, " << bType
-                                << ", found on line " << line
-                                << ". Using an \"any\" query." << std::endl;
+        BOOST_LOG(rdWarningLog)
+            << "unrecognized query bond type, " << bType << ", found on line "
+            << line << ". Using an \"any\" query." << std::endl;
       }
       break;
   }
@@ -1886,6 +1886,56 @@ void tokenizeV3000Line(std::string line, std::vector<std::string> &tokens) {
 #endif
 }
 
+void ParseV3000CollectionBlock(std::istream *inStream, unsigned int &line,
+                               RWMol *mol) {
+  PRECONDITION(inStream, "bad stream");
+  PRECONDITION(mol, "bad molecule");
+
+  std::string tempStr;
+
+  tempStr = getV3000Line(inStream, line);
+  while (tempStr.find("END COLLECTION") == std::string::npos) {
+    std::string trimmed = boost::trim_copy(tempStr);
+
+    std::vector<std::string> tokens;
+    std::vector<std::string>::iterator token;
+
+    tokenizeV3000Line(trimmed, tokens);
+
+    token = tokens.begin();
+    if (token == tokens.end()) {
+      std::ostringstream errout;
+      errout << "Bad collection line : '" << tempStr << "' on line" << line;
+      throw FileParseException(errout.str());
+    }
+    std::string typeToken = *token;
+    ++token;
+    if (token == tokens.end()) {
+      std::ostringstream errout;
+      errout << "Bad collection line : '" << tempStr << "' on line" << line;
+      throw FileParseException(errout.str());
+    }
+    if (typeToken.length() > 10 && typeToken.substr(0, 10) == "MDLV30/STE") {
+      size_t closeParen = token->find(")");
+      if (closeParen == std::string::npos || token->length() < 8 ||
+          token->substr(0, 7) != "ATOMS=(") {
+        std::ostringstream errout;
+        errout << "Bad collection line : '" << tempStr << "' on line" << line;
+        throw FileParseException(errout.str());
+      }
+      std::string rest = token->substr(7, closeParen - 7);
+      std::vector<std::string> atTokens;
+      boost::split(atTokens, rest, boost::is_any_of(" \t"),
+                   boost::token_compress_on);
+      size_t nAts = boost::lexical_cast<size_t>(atTokens[0]);
+      for (unsigned int i = 0; i < nAts; ++i) {
+        size_t nextI = boost::lexical_cast<size_t>(atTokens[i + 1]);
+      }
+    }
+    tempStr = getV3000Line(inStream, line);
+  }
+}
+
 void ParseV3000AtomBlock(std::istream *inStream, unsigned int &line,
                          unsigned int nAtoms, RWMol *mol, Conformer *conf) {
   PRECONDITION(inStream, "bad stream");
@@ -2076,9 +2126,9 @@ void ParseV3000BondBlock(std::istream *inStream, unsigned int &line,
           BOND_NULL_QUERY *q;
           q = makeBondNullQuery();
           bond->setQuery(q);
-          BOOST_LOG(rdWarningLog) << "unrecognized query bond type, " << bType
-                                  << ", found on line " << line
-                                  << ". Using an \"any\" query." << std::endl;
+          BOOST_LOG(rdWarningLog)
+              << "unrecognized query bond type, " << bType << ", found on line "
+              << line << ". Using an \"any\" query." << std::endl;
         }
         break;
     }
@@ -2311,13 +2361,19 @@ bool ParseV3000CTAB(std::istream *inStream, unsigned int &line, RWMol *mol,
   }
 
   while (tempStr.length() > 5 && tempStr.substr(0, 5) == "BEGIN") {
-    // skip blocks we don't know how to read
-    BOOST_LOG(rdWarningLog) << "skipping block at line " << line << ": "
-                            << tempStr << std::endl;
-    tempStr = getV3000Line(inStream, line);
-
-    while (tempStr.length() < 3 || tempStr.substr(0, 3) != "END") {
+    if (tempStr.length() > 15 && tempStr.substr(6, 10) == "COLLECTION") {
+      std::cerr << "COLLECTION" << std::endl;
+      ParseV3000CollectionBlock(inStream, line, mol);
+      // do somethgin
+    } else {
+      // skip blocks we don't know how to read
+      BOOST_LOG(rdWarningLog)
+          << "skipping block at line " << line << ": " << tempStr << std::endl;
       tempStr = getV3000Line(inStream, line);
+
+      while (tempStr.length() < 3 || tempStr.substr(0, 3) != "END") {
+        tempStr = getV3000Line(inStream, line);
+      }
     }
     tempStr = getV3000Line(inStream, line);
   }
