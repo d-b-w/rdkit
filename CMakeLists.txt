@@ -9,6 +9,7 @@ IF(NOT CMAKE_BUILD_TYPE)
 ENDIF(NOT CMAKE_BUILD_TYPE)
 
 enable_testing()
+include(CTest)
 
 set(CMAKE_MODULE_PATH
     ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/Code/cmake/Modules/")
@@ -171,6 +172,9 @@ if(MSVC)
   target_compile_definitions(rdkit_base INTERFACE "_CRT_SECURE_NO_WARNINGS")
 endif(MSVC)
 
+find_program( MEMORYCHECK_COMMAND valgrind )
+set( MEMORYCHECK_COMMAND_OPTIONS "--tool=memcheck --time-stamp=yes --num-callers=20 --gen-suppressions=all --leak-check=yes --error-exitcode=29 --trace-children=yes --leak-check=full")
+set( MEMORYCHECK_SUPPRESSIONS_FILE "${RDKit_SOURCE_DIR}/valgrind_suppress.txt" )
 
 # extra boost versions
 if(MSVC)
