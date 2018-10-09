@@ -42,6 +42,7 @@
 #include <GraphMol/SmilesParse/SmilesWrite.h>
 #include "GraphMol/ChemReactions/ReactionRunner.h"
 #include <RDGeneral/Invariant.h>
+#include <GraphMol/MonomerInfo.h>
 
 namespace RDKit {
 typedef std::vector<MatchVectType> VectMatchVectType;
@@ -122,25 +123,41 @@ bool getReactantMatches(const MOL_SPTR_VECT &reactants,
   return res;
 }  // end of getReactantMatches()
 
-void recurseOverReactantCombinations(
+// Return false if maxProducts has been hit...
+//  Otherwise we can't tell if we were stopped exactly
+//  or were terminated.
+bool recurseOverReactantCombinations(
     const VectVectMatchVectType &matchesByReactant,
     VectVectMatchVectType &matchesPerProduct, unsigned int level,
-    VectMatchVectType combination) {
+    VectMatchVectType combination,
+    unsigned int maxProducts) {
   unsigned int nReactants = matchesByReactant.size();
   URANGE_CHECK(level, nReactants);
   PRECONDITION(combination.size() == nReactants, "bad combination size");
+
+  if(maxProducts && matchesPerProduct.size() >= maxProducts) {
+    return false;
+  }
+
+  bool keepGoing = true;
   for (auto reactIt = matchesByReactant[level].begin();
        reactIt != matchesByReactant[level].end(); ++reactIt) {
     VectMatchVectType prod = combination;
     prod[level] = *reactIt;
     if (level == nReactants - 1) {
       // this is the bottom of the recursion:
+      if(maxProducts && matchesPerProduct.size() >= maxProducts) {
+        keepGoing = false;
+        break;
+      }
       matchesPerProduct.push_back(prod);
+
     } else {
-      recurseOverReactantCombinations(matchesByReactant, matchesPerProduct,
-                                      level + 1, prod);
+      keepGoing = recurseOverReactantCombinations(matchesByReactant, matchesPerProduct,
+                                                  level + 1, prod, maxProducts);
     }
   }
+  return keepGoing;
 }  // end of recurseOverReactantCombinations
 
 void updateImplicitAtomProperties(Atom *prodAtom, const Atom *reactAtom) {
@@ -167,12 +184,17 @@ void updateImplicitAtomProperties(Atom *prodAtom, const Atom *reactAtom) {
 
 void generateReactantCombinations(
     const VectVectMatchVectType &matchesByReactant,
-    VectVectMatchVectType &matchesPerProduct) {
+    VectVectMatchVectType &matchesPerProduct,
+    unsigned int maxProducts) {
   matchesPerProduct.clear();
   VectMatchVectType tmp;
   tmp.clear();
   tmp.resize(matchesByReactant.size());
-  recurseOverReactantCombinations(matchesByReactant, matchesPerProduct, 0, tmp);
+  if (!recurseOverReactantCombinations(matchesByReactant, matchesPerProduct, 0, tmp, maxProducts)) {
+    BOOST_LOG(rdWarningLog)
+        << "Maximum product count hit " << maxProducts << ", stopping reaction early...\n";
+
+  }
 }  // end of generateReactantCombinations()
 
 RWMOL_SPTR convertTemplateToMol(const ROMOL_SPTR prodTemplateSptr) {
@@ -429,13 +451,15 @@ void setReactantAtomPropertiesToProduct(Atom *productAtom,
     if (productAtom->hasProp(common_properties::_MolFileRLabel)) {
       productAtom->clearProp(common_properties::_MolFileRLabel);
     }
-    productAtom->setProp<unsigned int>(common_properties::reactantAtomIdx, reactantAtom.getIdx());
+    productAtom->setProp<unsigned int>(common_properties::reactantAtomIdx,
+                                       reactantAtom.getIdx());
     productAtom->setProp(WAS_DUMMY, true);
   } else {
     // remove bookkeeping labels (if present)
     if (productAtom->hasProp(WAS_DUMMY)) productAtom->clearProp(WAS_DUMMY);
   }
-  productAtom->setProp<unsigned int>(common_properties::reactantAtomIdx, reactantAtom.getIdx());
+  productAtom->setProp<unsigned int>(common_properties::reactantAtomIdx,
+                                     reactantAtom.getIdx());
   if (setImplicitProperties) {
     updateImplicitAtomProperties(productAtom, &reactantAtom);
   }
@@ -452,6 +476,11 @@ void setReactantAtomPropertiesToProduct(Atom *productAtom,
       reactantAtom.getChiralTag() != Atom::CHI_OTHER &&
       productAtom->hasProp(common_properties::molInversionFlag)) {
     checkProductChirality(reactantAtom.getChiralTag(), productAtom);
+  }
+
+  // copy over residue information if it's there. This was github #1632
+  if (reactantAtom.getMonomerInfo()) {
+    productAtom->setMonomerInfo(reactantAtom.getMonomerInfo()->copy());
   }
 }
 
@@ -483,7 +512,8 @@ void addMissingProductAtom(const Atom &reactAtom, unsigned reactNeighborIdx,
                            ReactantProductAtomMapping *mapping) {
   auto *newAtom = new Atom(reactAtom);
   unsigned reactAtomIdx = reactAtom.getIdx();
-  newAtom->setProp<unsigned int>(common_properties::reactantAtomIdx, reactAtomIdx);
+  newAtom->setProp<unsigned int>(common_properties::reactantAtomIdx,
+                                 reactAtomIdx);
   unsigned productIdx = product->addAtom(newAtom, false, true);
   mapping->reactProdAtomMap[reactAtomIdx].push_back(productIdx);
   mapping->prodReactAtomMap[productIdx] = reactAtomIdx;
@@ -576,13 +606,17 @@ void addReactantNeighborsToProduct(
             if (!product->getBondBetweenAtoms(prodBeginIdx, prodEndIdx)) {
               // They must be mapped
               CHECK_INVARIANT(
-                  product->getAtomWithIdx(prodBeginIdx)->hasProp(common_properties::reactionMapNum) &&
-                      product->getAtomWithIdx(prodEndIdx)->hasProp(common_properties::reactionMapNum),
+                  product->getAtomWithIdx(prodBeginIdx)
+                          ->hasProp(common_properties::reactionMapNum) &&
+                      product->getAtomWithIdx(prodEndIdx)
+                          ->hasProp(common_properties::reactionMapNum),
                   "atoms should be mapped in product");
-              int a1mapidx = product->getAtomWithIdx(prodBeginIdx)
-                                 ->getProp<int>(common_properties::reactionMapNum);
+              int a1mapidx =
+                  product->getAtomWithIdx(prodBeginIdx)
+                      ->getProp<int>(common_properties::reactionMapNum);
               int a2mapidx =
-                  product->getAtomWithIdx(prodEndIdx)->getProp<int>(common_properties::reactionMapNum);
+                  product->getAtomWithIdx(prodEndIdx)
+                      ->getProp<int>(common_properties::reactionMapNum);
               if (a1mapidx > a2mapidx) std::swap(a1mapidx, a2mapidx);
               if (mapping->reactantTemplateAtomBonds.find(
                       std::make_pair(a1mapidx, a2mapidx)) ==
@@ -906,7 +940,8 @@ MOL_SPTR_VECT generateOneProductSet(
 }  // namespace ReactionRunnerUtils
 
 std::vector<MOL_SPTR_VECT> run_Reactants(const ChemicalReaction &rxn,
-                                         const MOL_SPTR_VECT &reactants) {
+                                         const MOL_SPTR_VECT &reactants,
+                                         unsigned int maxProducts) {
   if (!rxn.isInitialized()) {
     throw ChemicalReactionException(
         "initMatchers() must be called before runReactants()");
@@ -941,7 +976,8 @@ std::vector<MOL_SPTR_VECT> run_Reactants(const ChemicalReaction &rxn,
   // start by doing the combinatorics on the matches:
   VectVectMatchVectType reactantMatchesPerProduct;
   ReactionRunnerUtils::generateReactantCombinations(matchesByReactant,
-                                                    reactantMatchesPerProduct);
+                                                    reactantMatchesPerProduct,
+                                                    maxProducts);
   productMols.resize(reactantMatchesPerProduct.size());
 
   for (unsigned int productId = 0; productId != productMols.size();
@@ -1064,7 +1100,8 @@ ROMol *reduceProductToSideChains(const ROMOL_SPTR &product,
 
       while (nbrIdx != endNbrs) {
         Atom *nbr = mol->getAtomWithIdx(*nbrIdx);
-        if (!nbr->hasProp(common_properties::reactionMapNum) && nbr->hasProp(common_properties::reactantAtomIdx)) {
+        if (!nbr->hasProp(common_properties::reactionMapNum) &&
+            nbr->hasProp(common_properties::reactantAtomIdx)) {
           if (nbr->hasProp(WAS_DUMMY)) {
             bonds_to_product.push_back(RGroup(
                 nbr,
