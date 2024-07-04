@@ -62,19 +62,6 @@ inline const char *GetTypeName<bool>() {
   return "a True or False value";
 }
 
-template <class T, class U>
-bool AddToDict(const U &ob, boost::python::dict &dict, const std::string &key) {
-  T res;
-  try {
-    if (ob.getPropIfPresent(key, res)) {
-      dict[key] = res;
-    }
-  } catch (std::bad_any_cast &) {
-    return false;
-  }
-  return true;
-}
-
 template <class T>
 boost::python::dict GetPropsAsDict(const T &obj, bool includePrivate,
                                    bool includeComputed,
