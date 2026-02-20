@@ -89,6 +89,7 @@ add_subdirectory(SynthonSpaceSearch)
 add_subdirectory(EnumerateStereoisomers)
 
 add_subdirectory(CIPLabeler)
+add_subdirectory(NewCIPLabeler)
 add_subdirectory(Deprotect)
 
 if (RDK_BUILD_STRUCTCHECKER_SUPPORT)
