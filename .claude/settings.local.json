@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh pr view:*)",
+      "Bash(gh pr diff:*)",
+      "Bash(gh api:*)",
+      "Bash(/Users/dbn/builds/26-2/source/mmshare/build_tools/buildinger.sh:*)",
+      "Bash(grep:*)",
+      "Bash(/Users/dbn/builds/26-2/build/rdkit/build/Code/GraphMol/NewCIPLabeler/testNewCIPLabeler:*)",
+      "Bash(/Users/dbn/builds/26-2/source/rdkit/run_newcip_tests.sh \"[phase1]\")",
+      "Bash(/Users/dbn/builds/26-2/source/rdkit/run_newcip_tests.sh:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(TIMEOUT=10 /Users/dbn/builds/26-2/source/rdkit/run_newcip_tests.sh:*)"
+    ]
+  }
+}

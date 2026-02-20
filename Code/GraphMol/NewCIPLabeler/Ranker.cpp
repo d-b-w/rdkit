@@ -34,8 +34,12 @@ CenterRanking rankSubstituents(const ROMol& mol,
   boost::dynamic_bitset<> visited(mol.getNumAtoms());
   visited.set(center->getIdx());  // Don't backtrack to center
 
-  // If max_shells is 0, use a reasonable default (100 shells should be enough)
-  uint32_t max_iter = (max_shells == 0) ? 100 : max_shells;
+  // Safety limits: prevent infinite loops
+  // Hard limit of 20 shells for Phase 2 development
+  constexpr uint32_t HARD_MAX_SHELLS = 20;
+
+  // If max_shells is 0, use conservative default during development
+  uint32_t max_iter = (max_shells == 0) ? HARD_MAX_SHELLS : std::min(max_shells, HARD_MAX_SHELLS);
 
   for (uint32_t shell = 0; shell < max_iter; ++shell) {
     // Expand all substituents to this shell

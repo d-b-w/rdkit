@@ -40,6 +40,9 @@ void Substituent::expandNextShell(const ROMol& mol,
     // Expand from previous shell
     const auto& prev = shells[new_shell_idx - 1];
 
+    // Safety limit: prevent infinite expansion
+    constexpr size_t MAX_SHELL_SIZE = 1000;
+
     for (size_t i = 0; i < prev.atoms.size(); ++i) {
       const Atom* atom = prev.atoms[i];
       if (atom == nullptr) {
@@ -47,6 +50,16 @@ void Substituent::expandNextShell(const ROMol& mol,
       }
 
       uint32_t parent_mult = prev.multiplicities[i];
+
+      // Don't expand from duplicate nodes (ring closures with mult=0)
+      if (parent_mult == 0) {
+        continue;
+      }
+
+      // Safety check: prevent shell explosion
+      if (new_shell.atoms.size() > MAX_SHELL_SIZE) {
+        break;
+      }
 
       for (const auto& bond : mol.atomBonds(atom)) {
         const Atom* nbr = bond->getOtherAtom(atom);

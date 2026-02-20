@@ -12,5 +12,32 @@ if [ ! -f "$TEST_EXEC" ]; then
     exit 1
 fi
 
-# Run with any arguments passed to script
-$TEST_EXEC "$@"
+# Run with timeout to prevent infinite loops (30 second default)
+# Usage: TIMEOUT=60 ./run_newcip_tests.sh "[phase2]"
+TIMEOUT="${TIMEOUT:-30}"
+
+# macOS doesn't have timeout, try gtimeout or use perl workaround
+if command -v gtimeout >/dev/null 2>&1; then
+    gtimeout "${TIMEOUT}s" $TEST_EXEC "$@"
+    EXIT_CODE=$?
+elif command -v timeout >/dev/null 2>&1; then
+    timeout "${TIMEOUT}s" $TEST_EXEC "$@"
+    EXIT_CODE=$?
+else
+    # Fallback: run with perl-based timeout
+    perl -e "alarm ${TIMEOUT}; exec @ARGV" $TEST_EXEC "$@"
+    EXIT_CODE=$?
+    if [ $EXIT_CODE -eq 142 ]; then  # SIGALRM
+        echo ""
+        echo "ERROR: Tests timed out after ${TIMEOUT} seconds - likely infinite loop!"
+        exit 124
+    fi
+fi
+
+if [ $EXIT_CODE -eq 124 ]; then
+    echo ""
+    echo "ERROR: Tests timed out after ${TIMEOUT} seconds - likely infinite loop!"
+    exit 124
+fi
+
+exit $EXIT_CODE
