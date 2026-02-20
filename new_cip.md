@@ -6,7 +6,6 @@ There is an implementation in Code/GraphMol/CIPLabeler. It's super slow, and the
 
 Internally, the implementation should sort/rank the substituents of each center. It should denote whether the sorted order is achiral, chiral, or pseudochiral. The implementation must be flexible enough to deal with both atom- and bond- centered stereochemistry.
 
-
 CIP Chirality is a thorny problem to calculate efficiently and accurately. Our implementation should prioritize accuracy and maintainability, but performance is also very important. As we think of potential optimizations, you can take advantage of these assumptions.
 * All potential stereo centers and bonds will be marked
 * Most potential stereo centers will have a CIP label
