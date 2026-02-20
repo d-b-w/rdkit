@@ -11,7 +11,8 @@
       "Bash(/Users/dbn/builds/26-2/source/rdkit/run_newcip_tests.sh:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(TIMEOUT=10 /Users/dbn/builds/26-2/source/rdkit/run_newcip_tests.sh:*)"
+      "Bash(TIMEOUT=10 /Users/dbn/builds/26-2/source/rdkit/run_newcip_tests.sh:*)",
+      "Bash(TIMEOUT=30 /Users/dbn/builds/26-2/source/rdkit/run_newcip_tests.sh:*)"
     ]
   }
 }

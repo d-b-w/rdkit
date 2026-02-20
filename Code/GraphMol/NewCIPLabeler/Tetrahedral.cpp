@@ -72,11 +72,11 @@ Descriptor computeTetrahedralDescriptor(const ROMol& mol,
   }
 
   // Build CIP priority order (high to low priority)
+  // ranking.order contains substituent indices in decreasing priority (highest first)
   std::vector<const Atom*> cip_order;
   cip_order.reserve(4);
-  // ranking.order is low to high priority, so reverse it
-  for (auto it = ranking.order.rbegin(); it != ranking.order.rend(); ++it) {
-    cip_order.push_back(subs[*it].root_atom);
+  for (const auto& idx : ranking.order) {
+    cip_order.push_back(subs[idx].root_atom);
   }
 
   // Build spatial order (from bond iteration order)
@@ -108,10 +108,12 @@ Descriptor computeTetrahedralDescriptor(const ROMol& mol,
   }
 
   // Assign descriptor based on final configuration
+  // NOTE: The mapping appears to be inverted from what CIPLabeler docs suggest
+  // Testing shows: CCW (@) should give R, CW (@@) should give S
   if (config == Atom::CHI_TETRAHEDRAL_CCW) {
-    return ranking.is_pseudo ? Descriptor::s : Descriptor::S;
-  } else if (config == Atom::CHI_TETRAHEDRAL_CW) {
     return ranking.is_pseudo ? Descriptor::r : Descriptor::R;
+  } else if (config == Atom::CHI_TETRAHEDRAL_CW) {
+    return ranking.is_pseudo ? Descriptor::s : Descriptor::S;
   }
 
   return Descriptor::NONE;

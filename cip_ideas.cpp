@@ -35,9 +35,10 @@ void sort(v, indices, cmp)
     std::sort(v.begin() + indices[0], v.begin() + indices[1], cmp);
 }
 
+
+template <T cmp>
+rank_ligands(src, ligand1, ligand2)
 {
-    
-    
     auto vector<atom> this;
     auto vector<std::span<atom>> this;
     auto vector<atom> that;
@@ -53,5 +54,5 @@ void sort(v, indices, cmp)
         }
         // expand the shells
     }
-    
+
 }

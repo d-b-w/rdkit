@@ -86,13 +86,14 @@ CenterRanking buildRankingResult(const std::vector<Substituent>& subs,
 
   result.is_unique = true;
 
-  // Build order vector (indices sorted by rank, low to high priority)
+  // Build order vector (indices sorted by rank)
+  // Note: rank 0 = highest priority, so sorting ascending gives highest priority first
   std::vector<std::pair<int, size_t>> rank_idx;
   for (size_t i = 0; i < subs.size(); ++i) {
     rank_idx.emplace_back(subs[i].final_rank, i);
   }
 
-  // Sort by rank (ascending = lowest priority first)
+  // Sort by rank (ascending = rank 0 first = highest priority first)
   std::sort(rank_idx.begin(), rank_idx.end());
 
   result.order.reserve(rank_idx.size());
