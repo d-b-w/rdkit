@@ -92,6 +92,4 @@ rank_ligands(mol, src, ligand1, ligand2)
     }
 
 
-
-
 }

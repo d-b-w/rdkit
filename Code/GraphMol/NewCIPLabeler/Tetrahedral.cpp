@@ -108,12 +108,11 @@ Descriptor computeTetrahedralDescriptor(const ROMol& mol,
   }
 
   // Assign descriptor based on final configuration
-  // NOTE: The mapping appears to be inverted from what CIPLabeler docs suggest
-  // Testing shows: CCW (@) should give R, CW (@@) should give S
+  // CCW (@) → S, CW (@@) → R (matches old CIPLabeler)
   if (config == Atom::CHI_TETRAHEDRAL_CCW) {
-    return ranking.is_pseudo ? Descriptor::r : Descriptor::R;
-  } else if (config == Atom::CHI_TETRAHEDRAL_CW) {
     return ranking.is_pseudo ? Descriptor::s : Descriptor::S;
+  } else if (config == Atom::CHI_TETRAHEDRAL_CW) {
+    return ranking.is_pseudo ? Descriptor::r : Descriptor::R;
   }
 
   return Descriptor::NONE;

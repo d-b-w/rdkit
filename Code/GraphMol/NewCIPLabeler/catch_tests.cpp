@@ -187,6 +187,7 @@ TEST_CASE("Debug SmilesToMol CIP behavior", "[newCIP][debug]") {
 
   // Now clear and try to reassign
   atom->clearProp(common_properties::_CIPCode);
+  mol->clearProp(common_properties::_CIPComputed);  // Also clear molecule flag
 
   bool exception_thrown = false;
   std::string exception_msg;
