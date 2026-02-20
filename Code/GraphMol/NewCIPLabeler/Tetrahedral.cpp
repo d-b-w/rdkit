@@ -25,9 +25,33 @@ namespace {
 // Returns: 1 (odd permutation) or 2 (even permutation), 0 on error
 int computeParity4(const std::vector<const Atom*>& cip_order,
                    const std::vector<const Atom*>& spatial_order) {
+  std::cerr << "[DEBUG]     computeParity4: ENTER" << std::endl;
+
   if (cip_order.size() != 4 || spatial_order.size() != 4) {
+    std::cerr << "[DEBUG]       EXIT: size mismatch (cip=" << cip_order.size()
+              << " spatial=" << spatial_order.size() << ")" << std::endl;
     return 0;
   }
+
+  std::cerr << "[DEBUG]       CIP order: ";
+  for (const auto* atom : cip_order) {
+    if (atom) {
+      std::cerr << atom->getIdx() << "(" << atom->getSymbol() << ") ";
+    } else {
+      std::cerr << "H ";
+    }
+  }
+  std::cerr << std::endl;
+
+  std::cerr << "[DEBUG]       Spatial order: ";
+  for (const auto* atom : spatial_order) {
+    if (atom) {
+      std::cerr << atom->getIdx() << "(" << atom->getSymbol() << ") ";
+    } else {
+      std::cerr << "H ";
+    }
+  }
+  std::cerr << std::endl;
 
   // Build permutation array: for each spatial position, find its CIP rank
   std::vector<int> perm(4);
@@ -35,10 +59,24 @@ int computeParity4(const std::vector<const Atom*>& cip_order,
     // Find where spatial_order[i] appears in cip_order
     auto it = std::find(cip_order.begin(), cip_order.end(), spatial_order[i]);
     if (it == cip_order.end()) {
+      std::cerr << "[DEBUG]       EXIT: atom at spatial[" << i << "] (";
+      if (spatial_order[i]) {
+        std::cerr << spatial_order[i]->getIdx();
+      } else {
+        std::cerr << "H";
+      }
+      std::cerr << ") not found in CIP order" << std::endl;
       return 0;  // Mismatch
     }
     perm[i] = static_cast<int>(std::distance(cip_order.begin(), it));
   }
+
+  std::cerr << "[DEBUG]       Permutation: [";
+  for (size_t i = 0; i < perm.size(); ++i) {
+    std::cerr << perm[i];
+    if (i < perm.size() - 1) std::cerr << ", ";
+  }
+  std::cerr << "]" << std::endl;
 
   // Count inversions to determine parity
   int inversions = 0;
@@ -50,8 +88,12 @@ int computeParity4(const std::vector<const Atom*>& cip_order,
     }
   }
 
+  std::cerr << "[DEBUG]       Inversions: " << inversions << std::endl;
+
   // Odd inversions = odd permutation (1), even inversions = even permutation (2)
-  return (inversions % 2 == 1) ? 1 : 2;
+  int result = (inversions % 2 == 1) ? 1 : 2;
+  std::cerr << "[DEBUG]       Returning: " << result << std::endl;
+  return result;
 }
 
 Descriptor computeTetrahedralDescriptor(const ROMol& mol,
