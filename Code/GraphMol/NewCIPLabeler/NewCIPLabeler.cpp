@@ -15,6 +15,7 @@
 #include <RDGeneral/Invariant.h>
 #include <vector>
 #include <algorithm>
+#include <iostream>
 
 namespace RDKit {
 namespace NewCIPLabeler {
@@ -122,21 +123,33 @@ void assignCIPLabels(ROMol &mol,
                      const boost::dynamic_bitset<> &atoms,
                      const boost::dynamic_bitset<> &bonds,
                      unsigned int maxRecursiveIterations) {
+  std::cerr << "[DEBUG] assignCIPLabels: ENTER" << std::endl;
+  std::cerr << "[DEBUG]   Molecule has " << mol.getNumAtoms() << " atoms" << std::endl;
+
   // Collect potential stereocenters
   auto stereo_atoms = findStereoAtoms(mol, atoms);
   auto stereo_bonds = findStereoBonds(mol, bonds);
+
+  std::cerr << "[DEBUG]   Found " << stereo_atoms.size() << " stereo atoms" << std::endl;
+  for (auto* atom : stereo_atoms) {
+    std::cerr << "[DEBUG]     Atom " << atom->getIdx()
+              << " tag=" << static_cast<int>(atom->getChiralTag()) << std::endl;
+  }
 
   // Sort by complexity (simple first)
   stereo_atoms = sortByComplexity(stereo_atoms, mol);
 
   // Process each stereocenter
   for (auto* atom : stereo_atoms) {
+    std::cerr << "[DEBUG]   Processing atom " << atom->getIdx() << std::endl;
     try {
       labelTetrahedralCenter(mol, atom, maxRecursiveIterations);
     } catch (const MaxIterationsExceeded&) {
+      std::cerr << "[DEBUG]     MaxIterationsExceeded for atom " << atom->getIdx() << std::endl;
       // Let it propagate up
       throw;
     } catch (const std::exception& e) {
+      std::cerr << "[DEBUG]     Exception for atom " << atom->getIdx() << ": " << e.what() << std::endl;
       // Silently skip atoms that fail labeling
       // This matches old CIPLabeler behavior
       // TODO: Consider logging these failures in debug mode
@@ -150,7 +163,9 @@ void assignCIPLabels(ROMol &mol,
   // }
 
   // Mark molecule as having CIP computed
+  std::cerr << "[DEBUG]   Setting _CIPComputed on molecule" << std::endl;
   mol.setProp(common_properties::_CIPComputed, true);
+  std::cerr << "[DEBUG] assignCIPLabels: EXIT" << std::endl;
 }
 
 }  // namespace NewCIPLabeler
