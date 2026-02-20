@@ -99,8 +99,8 @@ bool tryConstitutionalRanking(const ROMol& mol,
 bool applyRankingRules(const ROMol& mol,
                        std::vector<Substituent>& subs,
                        uint32_t shell_depth) {
-  // For now, implement simple lexicographic comparison at the shell level
-  // TODO: Full CIP rules implementation in Phase 2
+  // Implement CIP Rule 2: Compare paths incrementally
+  // At each shell, create a sorted list of atomic descriptors considering multiplicities
 
   // If we don't have enough shells yet, can't resolve
   for (const auto& sub : subs) {
@@ -109,48 +109,70 @@ bool applyRankingRules(const ROMol& mol,
     }
   }
 
-  // Build comparison keys for each substituent at this shell depth
+  // Build comparison keys for each substituent considering ALL shells up to depth
   std::vector<std::pair<std::vector<int>, size_t>> keys;
   keys.reserve(subs.size());
 
   for (size_t i = 0; i < subs.size(); ++i) {
-    const auto& shell = subs[i].shells[shell_depth];
     std::vector<int> key;
 
-    // Create sorted list of (atomic_num, mass) pairs
-    for (const auto* atom : shell.atoms) {
-      if (atom == nullptr) {
-        key.push_back(1001);  // H
-      } else {
-        int z = atom->getAtomicNum();
-        auto* pt = PeriodicTable::getTable();
-        unsigned int mass = atom->getIsotope() ? atom->getIsotope() :
-            static_cast<unsigned int>(pt->getMostCommonIsotopeMass(z));
-        key.push_back(z * 1000 + static_cast<int>(mass));
+    // Collect atoms from all shells up to and including current depth
+    // Each atom contributes (Z * 1000000 + mass * 1000 + multiplicity)
+    for (uint32_t depth = 0; depth <= shell_depth; ++depth) {
+      if (depth >= subs[i].shells.size()) {
+        break;
       }
-    }
 
-    // Sort the key for lexicographic comparison
-    std::sort(key.rbegin(), key.rend());  // Reverse sort (higher priority first)
+      const auto& shell = subs[i].shells[depth];
+
+      // Create atom descriptors with multiplicities
+      std::vector<int> shell_descriptors;
+      for (size_t j = 0; j < shell.atoms.size(); ++j) {
+        const Atom* atom = shell.atoms[j];
+        uint32_t mult = shell.multiplicities[j];
+
+        int descriptor;
+        if (atom == nullptr) {
+          // Implicit H
+          descriptor = 1001000 + mult;  // Z=1, mass=1, mult
+        } else {
+          int z = atom->getAtomicNum();
+          auto* pt = PeriodicTable::getTable();
+          unsigned int mass = atom->getIsotope() ? atom->getIsotope() :
+              static_cast<unsigned int>(pt->getMostCommonIsotopeMass(z));
+
+          // Encode as: Z * 1000000 + mass * 1000 + multiplicity
+          // Multiplicity 0 means duplicate (ring closure)
+          descriptor = z * 1000000 + static_cast<int>(mass) * 1000 + static_cast<int>(mult);
+        }
+
+        shell_descriptors.push_back(descriptor);
+      }
+
+      // Sort descriptors for this shell (descending = higher priority first)
+      std::sort(shell_descriptors.rbegin(), shell_descriptors.rend());
+
+      // Append to overall key
+      key.insert(key.end(), shell_descriptors.begin(), shell_descriptors.end());
+    }
 
     keys.emplace_back(std::move(key), i);
   }
 
-  // Sort by keys
+  // Sort substituents by their keys (lexicographic, reverse for CIP priority)
   std::sort(keys.begin(), keys.end(),
             [](const auto& a, const auto& b) {
-              // Lexicographic comparison (reverse for priority)
               return a.first > b.first;
             });
 
   // Check for ties
   for (size_t i = 1; i < keys.size(); ++i) {
     if (keys[i].first == keys[i-1].first) {
-      return false;  // Still have ties
+      return false;  // Still have ties, need more shells
     }
   }
 
-  // All unique - assign ranks
+  // All unique - assign ranks (rank 0 = highest priority)
   for (size_t rank = 0; rank < keys.size(); ++rank) {
     size_t sub_idx = keys[rank].second;
     subs[sub_idx].final_rank = static_cast<int>(rank);

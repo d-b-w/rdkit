@@ -168,3 +168,137 @@ TEST_CASE("Descriptor to_string", "[newCIP][phase1]") {
   CHECK(to_string(Descriptor::M) == "M");
   CHECK(to_string(Descriptor::P) == "P");
 }
+
+// ============================================================================
+// Phase 2: Shell Expansion Tests
+// ============================================================================
+
+TEST_CASE("One shell expansion", "[newCIP][phase2]") {
+  SECTION("Ethyl groups require 1-shell expansion") {
+    // CC[C@H](C)CC - two ethyl groups, need to look beyond first carbon
+    auto mol = "CC[C@H](C)CC"_smiles;
+    REQUIRE(mol);
+
+    assignCIPLabels(*mol);
+
+    auto* center = mol->getAtomWithIdx(2);
+    std::string cip_code;
+    CHECK(center->getPropIfPresent(common_properties::_CIPCode, cip_code));
+    // Should get a label (R or S) even though immediate neighbors are all C
+  }
+
+  SECTION("Propyl vs methyl") {
+    // CCC[C@H](C)F - propyl > ethyl at second shell
+    auto mol = "CCC[C@H](C)F"_smiles;
+    REQUIRE(mol);
+
+    assignCIPLabels(*mol);
+
+    auto* center = mol->getAtomWithIdx(3);
+    std::string cip_code;
+    CHECK(center->getPropIfPresent(common_properties::_CIPCode, cip_code));
+    CHECK_FALSE(cip_code.empty());
+  }
+}
+
+TEST_CASE("Ring systems", "[newCIP][phase2]") {
+  SECTION("Cyclohexane with substituent") {
+    // Ring system with chiral center
+    auto mol = "C1CC[C@H](Br)CC1"_smiles;
+    REQUIRE(mol);
+
+    assignCIPLabels(*mol);
+
+    auto* center = mol->getAtomWithIdx(3);
+    std::string cip_code;
+    CHECK(center->getPropIfPresent(common_properties::_CIPCode, cip_code));
+    CHECK_FALSE(cip_code.empty());
+  }
+
+  SECTION("Bridged ring") {
+    // More complex ring system
+    auto mol = "C1C[C@H]2CC[C@H](C1)C2"_smiles;
+    REQUIRE(mol);
+
+    assignCIPLabels(*mol);
+
+    // Should handle ring closure properly
+    bool computed = false;
+    mol->getPropIfPresent(common_properties::_CIPComputed, computed);
+    CHECK(computed);
+  }
+}
+
+TEST_CASE("Symmetric substituents", "[newCIP][phase2]") {
+  SECTION("Two identical branches") {
+    // Need multiple shells to distinguish
+    auto mol = "CC(C)[C@H](C(C)C)Br"_smiles;
+    REQUIRE(mol);
+
+    assignCIPLabels(*mol);
+
+    auto* center = mol->getAtomWithIdx(3);
+    std::string cip_code;
+    CHECK(center->getPropIfPresent(common_properties::_CIPCode, cip_code));
+    CHECK_FALSE(cip_code.empty());
+  }
+}
+
+TEST_CASE("Multiple stereocenters", "[newCIP][phase2]") {
+  SECTION("Two independent centers") {
+    auto mol = "C[C@H](Cl)CC[C@H](Cl)C"_smiles;
+    REQUIRE(mol);
+
+    assignCIPLabels(*mol);
+
+    auto* center1 = mol->getAtomWithIdx(1);
+    auto* center2 = mol->getAtomWithIdx(5);
+
+    std::string cip1, cip2;
+    CHECK(center1->getPropIfPresent(common_properties::_CIPCode, cip1));
+    CHECK(center2->getPropIfPresent(common_properties::_CIPCode, cip2));
+
+    // Both should have labels
+    CHECK_FALSE(cip1.empty());
+    CHECK_FALSE(cip2.empty());
+  }
+}
+
+TEST_CASE("Port old CIPLabeler tests", "[newCIP][phase2]") {
+  SECTION("Tetrahedral assignment - Br[C@H](Cl)F") {
+    auto mol = "Br[C@H](Cl)F"_smiles;
+    REQUIRE(mol->getNumAtoms() == 4);
+
+    auto chiral_atom = mol->getAtomWithIdx(1);
+    chiral_atom->clearProp(common_properties::_CIPCode);
+    REQUIRE(chiral_atom->getChiralTag() == Atom::CHI_TETRAHEDRAL_CCW);
+
+    CHECK(!mol->hasProp(common_properties::_CIPComputed));
+    assignCIPLabels(*mol);
+    CHECK(mol->hasProp(common_properties::_CIPComputed));
+
+    std::string chirality;
+    CHECK(chiral_atom->getPropIfPresent(common_properties::_CIPCode, chirality));
+    CHECK(chirality == "S");
+  }
+
+  SECTION("Phosphine chirality") {
+    const std::vector<std::pair<std::string, std::string>> mols{
+        {"C[P@](C1CCCC1)C1=CC=CC=C1", "R"},
+        {"C[As@@](C1CCCC1)C1=CC=CC=C1", "S"},
+        {"C[P@H]C1CCCCC1", "R"},
+        {"C[P@@H]C1CCCCC1", "S"}};
+
+    for (const auto &ref : mols) {
+      INFO(ref.first);
+      std::unique_ptr<RWMol> mol{SmilesToMol(ref.first)};
+      REQUIRE(mol);
+      assignCIPLabels(*mol);
+
+      std::string chirality;
+      CHECK(mol->getAtomWithIdx(1)->getPropIfPresent(common_properties::_CIPCode,
+                                                     chirality));
+      CHECK(chirality == ref.second);
+    }
+  }
+}

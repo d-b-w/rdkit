@@ -550,9 +550,8 @@ TEST_CASE("Performance - complex symmetric molecule", "[.benchmark]") {
 ### Test Commands
 ```bash
 # Build
+/Users/dbn/builds/26-2/source/mmshare/build_tools/buildinger.sh -name 26-2 rdkit
 cd /Users/dbn/builds/26-2/source/rdkit
-mkdir build && cd build
-cmake ..
 make NewCIPLabelerTests
 
 # Run tests
