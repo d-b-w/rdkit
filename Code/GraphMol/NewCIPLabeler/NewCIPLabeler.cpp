@@ -139,6 +139,7 @@ void assignCIPLabels(ROMol &mol,
     } catch (const std::exception& e) {
       // Silently skip atoms that fail labeling
       // This matches old CIPLabeler behavior
+      // TODO: Consider logging these failures in debug mode
       continue;
     }
   }

@@ -169,6 +169,48 @@ TEST_CASE("Descriptor to_string", "[newCIP][phase1]") {
   CHECK(to_string(Descriptor::P) == "P");
 }
 
+TEST_CASE("Debug SmilesToMol CIP behavior", "[newCIP][debug]") {
+  auto mol = "Br[C@H](Cl)F"_smiles;
+  REQUIRE(mol);
+
+  // Check what SmilesToMol sets
+  INFO("After SmilesToMol:");
+  INFO("  Molecule _CIPComputed: " << mol->hasProp(common_properties::_CIPComputed));
+
+  auto* atom = mol->getAtomWithIdx(1);
+  std::string code;
+  bool hasCode = atom->getPropIfPresent(common_properties::_CIPCode, code);
+  INFO("  Atom _CIPCode present: " << hasCode);
+  if (hasCode) {
+    INFO("    Value: " << code);
+  }
+
+  // Now clear and try to reassign
+  atom->clearProp(common_properties::_CIPCode);
+
+  bool exception_thrown = false;
+  std::string exception_msg;
+  try {
+    assignCIPLabels(*mol);
+  } catch (const std::exception& e) {
+    exception_thrown = true;
+    exception_msg = e.what();
+  }
+
+  hasCode = atom->getPropIfPresent(common_properties::_CIPCode, code);
+  INFO("After clearProp + assignCIPLabels:");
+  INFO("  Exception thrown: " << exception_thrown);
+  if (exception_thrown) {
+    INFO("    Message: " << exception_msg);
+  }
+  INFO("  Atom _CIPCode present: " << hasCode);
+  if (hasCode) {
+    INFO("    Value: " << code);
+  }
+
+  CHECK(hasCode);
+}
+
 // ============================================================================
 // Phase 2: Shell Expansion Tests
 // ============================================================================
