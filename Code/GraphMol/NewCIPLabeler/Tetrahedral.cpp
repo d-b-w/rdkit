@@ -135,7 +135,7 @@ Descriptor computeTetrahedralDescriptor(const ROMol& mol,
   }
   // Add implicit H if needed
   if (spatial_order.size() == 3) {
-    spatial_order.push_back(center);  // Use center as placeholder for implicit H
+    spatial_order.push_back(nullptr);  // Use nullptr for implicit H (matches CIP order)
   }
 
   std::cerr << "[DEBUG]     spatial_order.size=" << spatial_order.size() << std::endl;
