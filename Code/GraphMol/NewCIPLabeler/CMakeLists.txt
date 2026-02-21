@@ -5,6 +5,7 @@ rdkit_library(NewCIPLabeler
               Rules.cpp
               Ranker.cpp
               Tetrahedral.cpp
+              DoubleBond.cpp
               LINK_LIBRARIES GraphMol)
 target_compile_definitions(NewCIPLabeler PRIVATE RDKIT_NEWCIPLABELER_BUILD)
 
@@ -19,6 +20,7 @@ rdkit_catch_test(testNewCIPLabeler catch_tests.cpp
                  Rules.cpp
                  Ranker.cpp
                  Tetrahedral.cpp
+                 DoubleBond.cpp
                  LINK_LIBRARIES SmilesParse GraphMol FileParsers)
 
 # Set the BUILD macro for DLL linkage consistency

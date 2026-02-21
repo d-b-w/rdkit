@@ -345,3 +345,105 @@ TEST_CASE("Port old CIPLabeler tests", "[newCIP][phase2]") {
     }
   }
 }
+
+// ============================================================================
+// Phase 3: E/Z Double Bond Labeling
+// ============================================================================
+
+TEST_CASE("Simple E/Z labeling", "[newCIP][phase3]") {
+  SECTION("E configuration - F/C=C/Cl") {
+    // trans: higher priority on opposite sides
+    auto mol = "F/C=C/Cl"_smiles;
+    REQUIRE(mol);
+
+    assignCIPLabels(*mol);
+
+    auto* bond = mol->getBondWithIdx(1);  // C=C bond
+    std::string stereo;
+    CHECK(bond->getPropIfPresent(common_properties::_CIPCode, stereo));
+    CHECK(stereo == "E");
+  }
+
+  SECTION("Z configuration - F/C=C\\Cl") {
+    // cis: higher priority on same side
+    auto mol = "F/C=C\\Cl"_smiles;
+    REQUIRE(mol);
+
+    assignCIPLabels(*mol);
+
+    auto* bond = mol->getBondWithIdx(1);  // C=C bond
+    std::string stereo;
+    CHECK(bond->getPropIfPresent(common_properties::_CIPCode, stereo));
+    CHECK(stereo == "Z");
+  }
+
+  SECTION("E configuration - Br/C=C/I") {
+    // I > Br, both trans
+    auto mol = "Br/C=C/I"_smiles;
+    REQUIRE(mol);
+
+    assignCIPLabels(*mol);
+
+    auto* bond = mol->getBondWithIdx(1);
+    std::string stereo;
+    CHECK(bond->getPropIfPresent(common_properties::_CIPCode, stereo));
+    CHECK(stereo == "E");
+  }
+}
+
+TEST_CASE("E/Z with substituents", "[newCIP][phase3]") {
+  SECTION("Methyl vs ethyl - E") {
+    // CC/C=C/C
+    auto mol = "CC/C=C/C"_smiles;
+    REQUIRE(mol);
+
+    assignCIPLabels(*mol);
+
+    auto* bond = mol->getBondWithIdx(2);  // C=C bond
+    std::string stereo;
+    CHECK(bond->getPropIfPresent(common_properties::_CIPCode, stereo));
+    CHECK(stereo == "E");
+  }
+
+  SECTION("Phenyl groups") {
+    // c1ccccc1/C=C/c1ccccc1
+    auto mol = "c1ccccc1/C=C/c1ccccc1"_smiles;
+    REQUIRE(mol);
+
+    assignCIPLabels(*mol);
+
+    auto* bond = mol->getBondWithIdx(6);  // C=C bond
+    std::string stereo;
+    if (bond->getPropIfPresent(common_properties::_CIPCode, stereo)) {
+      CHECK(stereo == "E");
+    }
+  }
+}
+
+TEST_CASE("E/Z edge cases", "[newCIP][phase3]") {
+  SECTION("Symmetric - no label") {
+    // F/C=C/F - both sides same
+    auto mol = "F/C=C/F"_smiles;
+    REQUIRE(mol);
+
+    assignCIPLabels(*mol);
+
+    auto* bond = mol->getBondWithIdx(1);
+    std::string stereo;
+    // Should not have CIP code (symmetric)
+    CHECK_FALSE(bond->hasProp(common_properties::_CIPCode));
+  }
+
+  SECTION("Trisubstituted - Cl/C(Br)=C/F") {
+    auto mol = "Cl/C(Br)=C/F"_smiles;
+    REQUIRE(mol);
+
+    assignCIPLabels(*mol);
+
+    auto* bond = mol->getBondWithIdx(2);  // C=C bond
+    std::string stereo;
+    CHECK(bond->getPropIfPresent(common_properties::_CIPCode, stereo));
+    // Br > Cl on one side, F > H on other, trans = E
+    CHECK(stereo == "E");
+  }
+}

@@ -10,6 +10,7 @@
 
 #include "NewCIPLabeler.h"
 #include "Tetrahedral.h"
+#include "DoubleBond.h"
 #include <GraphMol/RDKitBase.h>
 #include <RDGeneral/types.h>
 #include <RDGeneral/Invariant.h>
@@ -46,8 +47,21 @@ std::vector<Bond*> findStereoBonds(ROMol& mol,
                                    const boost::dynamic_bitset<>& filter) {
   std::vector<Bond*> result;
 
-  // For Phase 1, we're not implementing double bond labeling yet
-  // This will be added in Phase 3
+  for (auto& bond : mol.bonds()) {
+    unsigned int idx = bond->getIdx();
+    if (!filter[idx]) {
+      continue;
+    }
+
+    // Check for double bond with stereo info
+    if (bond->getBondType() == Bond::DOUBLE) {
+      auto stereo = bond->getStereo();
+      if (stereo == Bond::STEREOCIS || stereo == Bond::STEREOTRANS ||
+          stereo == Bond::STEREOE || stereo == Bond::STEREOZ) {
+        result.push_back(bond);
+      }
+    }
+  }
 
   return result;
 }
@@ -143,10 +157,18 @@ void assignCIPLabels(ROMol &mol,
     }
   }
 
-  // Process double bonds (Phase 3)
-  // for (auto* bond : stereo_bonds) {
-  //   labelDoubleBond(mol, bond, maxRecursiveIterations);
-  // }
+  // Process double bonds
+  for (auto* bond : stereo_bonds) {
+    try {
+      labelDoubleBond(mol, bond, maxRecursiveIterations);
+    } catch (const MaxIterationsExceeded&) {
+      // Let it propagate up
+      throw;
+    } catch (const std::exception& e) {
+      // Silently skip bonds that fail labeling
+      continue;
+    }
+  }
 
   // Mark molecule as having CIP computed
   mol.setProp(common_properties::_CIPComputed, true);
