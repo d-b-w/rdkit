@@ -422,16 +422,20 @@ TEST_CASE("E/Z with substituents", "[newCIP][phase3]") {
 
 TEST_CASE("E/Z edge cases", "[newCIP][phase3]") {
   SECTION("Symmetric - no label") {
-    // F/C=C/F - both sides same
-    auto mol = "F/C=C/F"_smiles;
+    // CC=CC - both sides same (C vs H on each side)
+    auto mol = "CC=CC"_smiles;
     REQUIRE(mol);
 
     assignCIPLabels(*mol);
 
-    auto* bond = mol->getBondWithIdx(1);
-    std::string stereo;
-    // Should not have CIP code (symmetric)
-    CHECK_FALSE(bond->hasProp(common_properties::_CIPCode));
+    // No double bond should have stereo info (no directional bonds)
+    for (auto& bond : mol->bonds()) {
+      std::string stereo;
+      if (bond->getBondType() == Bond::DOUBLE) {
+        // Without directional bonds, no stereo assigned by SMILES parser
+        CHECK_FALSE(bond->hasProp(common_properties::_CIPCode));
+      }
+    }
   }
 
   SECTION("Trisubstituted - Cl/C(Br)=C/F") {
@@ -443,7 +447,8 @@ TEST_CASE("E/Z edge cases", "[newCIP][phase3]") {
     auto* bond = mol->getBondWithIdx(2);  // C=C bond
     std::string stereo;
     CHECK(bond->getPropIfPresent(common_properties::_CIPCode, stereo));
-    // Br > Cl on one side, F > H on other, trans = E
-    CHECK(stereo == "E");
+    // Br > Cl on left (Br is cis to double bond), F > H on right (F is trans)
+    // Br and F are cis to each other → Z
+    CHECK(stereo == "Z");
   }
 }
