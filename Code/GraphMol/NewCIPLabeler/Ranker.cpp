@@ -34,11 +34,10 @@ CenterRanking rankSubstituents(const ROMol& mol,
   boost::dynamic_bitset<> visited(mol.getNumAtoms());
   visited.set(center->getIdx());  // Don't backtrack to center
 
-  // Safety limits: prevent infinite loops
-  // Hard limit of 20 shells for Phase 2 development
-  constexpr uint32_t HARD_MAX_SHELLS = 20;
+  // Safety limits: prevent infinite loops on pathological molecules
+  constexpr uint32_t HARD_MAX_SHELLS = 100;
 
-  // If max_shells is 0, use conservative default during development
+  // If max_shells is 0, use reasonable default
   uint32_t max_iter = (max_shells == 0) ? HARD_MAX_SHELLS : std::min(max_shells, HARD_MAX_SHELLS);
 
   for (uint32_t shell = 0; shell < max_iter; ++shell) {
