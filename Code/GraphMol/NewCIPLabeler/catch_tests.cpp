@@ -217,9 +217,9 @@ TEST_CASE("Debug SmilesToMol CIP behavior", "[newCIP][debug]") {
 // ============================================================================
 
 TEST_CASE("One shell expansion", "[newCIP][phase2]") {
-  SECTION("Ethyl groups require 1-shell expansion") {
-    // CC[C@H](C)CC - two ethyl groups, need to look beyond first carbon
-    auto mol = "CC[C@H](C)CC"_smiles;
+  SECTION("Ethyl vs methyl - 1-shell expansion") {
+    // CC[C@H](C)F - ethyl vs methyl, need shell expansion to distinguish
+    auto mol = "CC[C@H](C)F"_smiles;
     REQUIRE(mol);
 
     assignCIPLabels(*mol);
@@ -227,12 +227,13 @@ TEST_CASE("One shell expansion", "[newCIP][phase2]") {
     auto* center = mol->getAtomWithIdx(2);
     std::string cip_code;
     CHECK(center->getPropIfPresent(common_properties::_CIPCode, cip_code));
-    // Should get a label (R or S) even though immediate neighbors are all C
+    CHECK_FALSE(cip_code.empty());
+    // Ethyl > methyl at second shell
   }
 
-  SECTION("Propyl vs methyl") {
-    // CCC[C@H](C)F - propyl > ethyl at second shell
-    auto mol = "CCC[C@H](C)F"_smiles;
+  SECTION("Propyl vs ethyl - 2-shell expansion") {
+    // CCC[C@H](CC)F - propyl vs ethyl requires 2 shells
+    auto mol = "CCC[C@H](CC)F"_smiles;
     REQUIRE(mol);
 
     assignCIPLabels(*mol);
@@ -245,37 +246,37 @@ TEST_CASE("One shell expansion", "[newCIP][phase2]") {
 }
 
 TEST_CASE("Ring systems", "[newCIP][phase2]") {
-  SECTION("Cyclohexane with substituent") {
-    // Ring system with chiral center
-    auto mol = "C1CC[C@H](Br)CC1"_smiles;
+  SECTION("Cyclohexane with two substituents") {
+    // Ring with Br and F substituents - distinguishable
+    auto mol = "Br[C@H]1CCCC(F)C1"_smiles;
     REQUIRE(mol);
 
     assignCIPLabels(*mol);
 
-    auto* center = mol->getAtomWithIdx(3);
+    auto* center = mol->getAtomWithIdx(1);
     std::string cip_code;
     CHECK(center->getPropIfPresent(common_properties::_CIPCode, cip_code));
     CHECK_FALSE(cip_code.empty());
   }
 
-  SECTION("Bridged ring") {
-    // More complex ring system
-    auto mol = "C1C[C@H]2CC[C@H](C1)C2"_smiles;
+  SECTION("Simple ring with non-ring substituent") {
+    // Simpler: methyl on cyclohexane
+    auto mol = "C[C@H]1CCCCC1"_smiles;
     REQUIRE(mol);
 
     assignCIPLabels(*mol);
 
-    // Should handle ring closure properly
+    // Should handle ring properly - symmetric ring vs methyl
     bool computed = false;
     mol->getPropIfPresent(common_properties::_CIPComputed, computed);
     CHECK(computed);
   }
 }
 
-TEST_CASE("Symmetric substituents", "[newCIP][phase2]") {
-  SECTION("Two identical branches") {
-    // Need multiple shells to distinguish
-    auto mol = "CC(C)[C@H](C(C)C)Br"_smiles;
+TEST_CASE("Branched substituents", "[newCIP][phase2]") {
+  SECTION("Isopropyl vs methyl") {
+    // Isopropyl vs methyl requires shell expansion
+    auto mol = "CC(C)[C@H](C)Br"_smiles;
     REQUIRE(mol);
 
     assignCIPLabels(*mol);
