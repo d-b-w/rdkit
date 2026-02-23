@@ -85,9 +85,9 @@ Descriptor computeTetrahedralDescriptor(const ROMol& mol,
   for (const auto& bond : mol.atomBonds(center)) {
     spatial_order.push_back(bond->getOtherAtom(center));
   }
-  // Add implicit H if needed
-  if (spatial_order.size() == 3) {
-    spatial_order.push_back(nullptr);  // Use nullptr for implicit H (matches CIP order)
+  // Add nullptr for non-bonded substituents (implicit H, lone pairs, etc.)
+  while (spatial_order.size() < 4) {
+    spatial_order.push_back(nullptr);
   }
 
   if (spatial_order.size() != 4) {
@@ -104,28 +104,6 @@ Descriptor computeTetrahedralDescriptor(const ROMol& mol,
   auto config = tag;
   if (parity == 1) {  // Odd permutation - flip tag
     config = (tag == Atom::CHI_TETRAHEDRAL_CW) ?
-             Atom::CHI_TETRAHEDRAL_CCW : Atom::CHI_TETRAHEDRAL_CW;
-  }
-
-  // Assign descriptor based on final configuration
-  // CCW (@) → S, CW (@@) → R (matches old CIPLabeler)
-  // Note: For P/As with explicit H, the stereochemistry seems to be inverted
-  // This might be due to how RDKit encodes the stereo information
-  bool needs_flip = false;
-  int z = center->getAtomicNum();
-  if ((z == 15 || z == 33) && center->getTotalNumHs() == 0) {
-    // Phosphorus or Arsenic with explicit H (not implicit)
-    // Check if we have an explicit H substituent
-    for (const auto& sub : subs) {
-      if (sub.root_atom != nullptr && sub.root_atom->getAtomicNum() == 1) {
-        needs_flip = true;
-        break;
-      }
-    }
-  }
-
-  if (needs_flip) {
-    config = (config == Atom::CHI_TETRAHEDRAL_CW) ?
              Atom::CHI_TETRAHEDRAL_CCW : Atom::CHI_TETRAHEDRAL_CW;
   }
 
@@ -151,8 +129,8 @@ void labelTetrahedralCenter(ROMol& mol, Atom* center, uint32_t max_iters) {
     subs.back().connecting_bond = bond;
   }
 
-  // Add implicit H if present
-  if (center->getTotalNumHs() > 0 && subs.size() == 3) {
+  // Add implicit H if present (can happen with any number of explicit bonds)
+  if (center->getTotalNumHs() > 0) {
     subs.emplace_back();
     subs.back().root_atom = nullptr;  // nullptr represents implicit H
     subs.back().connecting_bond = nullptr;
