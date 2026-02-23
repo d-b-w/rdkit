@@ -13,6 +13,7 @@
 #include "NewCIPLabeler.h"
 #include <GraphMol/RDKitBase.h>
 #include <RDGeneral/Invariant.h>
+#include <iostream>
 
 namespace RDKit {
 namespace NewCIPLabeler {
@@ -31,8 +32,13 @@ CenterRanking rankSubstituents(const ROMol& mol,
   }
 
   // Need deeper analysis - expand shells iteratively
-  boost::dynamic_bitset<> visited(mol.getNumAtoms());
-  visited.set(center->getIdx());  // Don't backtrack to center
+  // Each substituent needs its own visited tracking
+  std::vector<boost::dynamic_bitset<>> visited_sets;
+  visited_sets.reserve(subs.size());
+  for (size_t i = 0; i < subs.size(); ++i) {
+    visited_sets.emplace_back(mol.getNumAtoms());
+    visited_sets[i].set(center->getIdx());  // Don't backtrack to center
+  }
 
   // Safety limits: prevent infinite loops on pathological molecules
   constexpr uint32_t HARD_MAX_SHELLS = 100;
@@ -42,9 +48,9 @@ CenterRanking rankSubstituents(const ROMol& mol,
 
   for (uint32_t shell = 0; shell < max_iter; ++shell) {
     // Expand all substituents to this shell
-    for (auto& sub : subs) {
-      if (sub.shells.size() <= shell) {
-        sub.expandNextShell(mol, visited);
+    for (size_t i = 0; i < subs.size(); ++i) {
+      if (subs[i].shells.size() <= shell) {
+        subs[i].expandNextShell(mol, visited_sets[i]);
       }
     }
 
@@ -54,9 +60,40 @@ CenterRanking rankSubstituents(const ROMol& mol,
       bool is_pseudo = checkPseudoAsymmetry(subs);
       return buildRankingResult(subs, is_pseudo);
     }
+
+    // Debug: warn if taking too long
+    if (shell == 20 || shell == 50 || shell == 75) {
+      std::cerr << "WARNING: CIP ranking at center " << center->getIdx()
+                << " reached shell " << shell << " without resolving\n";
+      std::cerr << "  Center atom: " << center->getSymbol()
+                << " with " << subs.size() << " substituents\n";
+      for (size_t i = 0; i < subs.size(); ++i) {
+        std::cerr << "    Sub[" << i << "]: ";
+        if (subs[i].root_atom == nullptr) {
+          std::cerr << (subs[i].is_lone_pair ? "LP" : "implH");
+        } else {
+          std::cerr << subs[i].root_atom->getSymbol() << " (idx=" << subs[i].root_atom->getIdx() << ")";
+        }
+        std::cerr << " - " << subs[i].shells.size() << " shells expanded\n";
+      }
+    }
   }
 
-  // Exceeded max iterations
+  // Exceeded max iterations - provide diagnostic info
+  std::cerr << "ERROR: Max iterations exceeded at center " << center->getIdx()
+            << " (" << center->getSymbol() << ")\n";
+  std::cerr << "  This likely indicates a perfectly symmetric structure\n";
+  std::cerr << "  or a bug in shell expansion. Substituents:\n";
+  for (size_t i = 0; i < subs.size(); ++i) {
+    std::cerr << "    [" << i << "]: ";
+    if (subs[i].root_atom == nullptr) {
+      std::cerr << (subs[i].is_lone_pair ? "LonePair" : "ImplicitH");
+    } else {
+      std::cerr << subs[i].root_atom->getSymbol() << "(idx=" << subs[i].root_atom->getIdx() << ")";
+    }
+    std::cerr << " - expanded to " << subs[i].shells.size() << " shells\n";
+  }
+
   throw MaxIterationsExceeded();
 }
 

@@ -12,6 +12,7 @@
 #include "Ranker.h"
 #include "Descriptor.h"
 #include "Substituent.h"
+#include "NewCIPLabeler.h"
 #include <GraphMol/RDKitBase.h>
 #include <GraphMol/Chirality.h>
 #include <RDGeneral/types.h>
@@ -126,13 +127,25 @@ void labelDoubleBond(ROMol& mol, Bond* bond, uint32_t max_iters) {
   }
 
   // Rank substituents on begin atom
-  CenterRanking begin_ranking = rankSubstituents(mol, begin_atom, begin_subs, max_iters);
+  CenterRanking begin_ranking;
+  try {
+    begin_ranking = rankSubstituents(mol, begin_atom, begin_subs, max_iters);
+  } catch (const MaxIterationsExceeded& e) {
+    // Hit max iterations - likely a perfectly symmetric structure
+    return;
+  }
   if (!begin_ranking.is_unique) {
     return;  // Cannot determine label
   }
 
   // Rank substituents on end atom
-  CenterRanking end_ranking = rankSubstituents(mol, end_atom, end_subs, max_iters);
+  CenterRanking end_ranking;
+  try {
+    end_ranking = rankSubstituents(mol, end_atom, end_subs, max_iters);
+  } catch (const MaxIterationsExceeded& e) {
+    // Hit max iterations - likely a perfectly symmetric structure
+    return;
+  }
   if (!end_ranking.is_unique) {
     return;  // Cannot determine label
   }

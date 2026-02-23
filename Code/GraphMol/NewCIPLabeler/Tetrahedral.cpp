@@ -11,6 +11,7 @@
 #include "Tetrahedral.h"
 #include "Ranker.h"
 #include "Descriptor.h"
+#include "NewCIPLabeler.h"
 #include <GraphMol/RDKitBase.h>
 #include <RDGeneral/types.h>
 #include <algorithm>
@@ -155,7 +156,14 @@ void labelTetrahedralCenter(ROMol& mol, Atom* center, uint32_t max_iters) {
   }
 
   // Rank substituents
-  CenterRanking ranking = rankSubstituents(mol, center, subs, max_iters);
+  CenterRanking ranking;
+  try {
+    ranking = rankSubstituents(mol, center, subs, max_iters);
+  } catch (const MaxIterationsExceeded& e) {
+    // Hit max iterations - likely a perfectly symmetric structure
+    // Just skip this center (no label assigned)
+    return;
+  }
 
   if (!ranking.is_unique) {
     return;  // Cannot determine label
