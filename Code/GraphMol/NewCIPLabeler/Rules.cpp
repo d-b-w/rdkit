@@ -102,12 +102,8 @@ bool applyRankingRules(const ROMol& mol,
   // Implement CIP Rule 2: Compare paths incrementally
   // At each shell, create a sorted list of atomic descriptors considering multiplicities
 
-  // If we don't have enough shells yet, can't resolve
-  for (const auto& sub : subs) {
-    if (sub.shells.size() <= shell_depth) {
-      return false;
-    }
-  }
+  // Note: Substituents can have different numbers of shells (e.g., implicit H stops at shell 0)
+  // Missing shells are treated as empty, which makes those subs lower priority
 
   // Build comparison keys for each substituent considering ALL shells up to depth
   std::vector<std::pair<std::vector<int>, size_t>> keys;
