@@ -41,7 +41,7 @@ CenterRanking rankSubstituents(const ROMol& mol,
   }
 
   // Safety limits: prevent infinite loops on pathological molecules
-  constexpr uint32_t HARD_MAX_SHELLS = 100;
+  constexpr uint32_t HARD_MAX_SHELLS = 200;
 
   // If max_shells is 0, use reasonable default
   uint32_t max_iter = (max_shells == 0) ? HARD_MAX_SHELLS : std::min(max_shells, HARD_MAX_SHELLS);
@@ -62,7 +62,7 @@ CenterRanking rankSubstituents(const ROMol& mol,
     }
 
     // Debug: warn if taking too long
-    if (shell == 20 || shell == 50 || shell == 75) {
+    if (shell == 20 || shell == 50 || shell == 100 || shell == 150) {
       std::cerr << "WARNING: CIP ranking at center " << center->getIdx()
                 << " reached shell " << shell << " without resolving\n";
       std::cerr << "  Center atom: " << center->getSymbol()
