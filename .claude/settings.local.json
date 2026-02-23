@@ -21,7 +21,8 @@
       "Bash(make:*)",
       "Bash(./build_and_test.sh:*)",
       "Bash(/tmp/perf_summary.md:*)",
-      "Bash(env RDBASE=/Users/dbn/builds/26-2/source/rdkit DYLD_LIBRARY_PATH=/Users/dbn/builds/26-2/build/rdkit/lib:/Users/dbn/builds/26-2/build/schrodinger_buildenv_packages/.pixi/envs/schrodinger/coordgenlibs-3.0.2/lib:/Users/dbn/builds/26-2/build/schrodinger_buildenv_packages/.pixi/envs/schrodinger/boost_1_81_0-py311-BLDMGR-8470/lib:/Users/dbn/builds/26-2/build/schrodinger_buildenv_packages/.pixi/envs/schrodinger/zstd-v1.5.5-boost-1_81_0-BLDMGR-7247/lib ./Code/GraphMol/NewCIPLabeler/testNewCIPLabeler_pdb:*)"
+      "Bash(env RDBASE=/Users/dbn/builds/26-2/source/rdkit DYLD_LIBRARY_PATH=/Users/dbn/builds/26-2/build/rdkit/lib:/Users/dbn/builds/26-2/build/schrodinger_buildenv_packages/.pixi/envs/schrodinger/coordgenlibs-3.0.2/lib:/Users/dbn/builds/26-2/build/schrodinger_buildenv_packages/.pixi/envs/schrodinger/boost_1_81_0-py311-BLDMGR-8470/lib:/Users/dbn/builds/26-2/build/schrodinger_buildenv_packages/.pixi/envs/schrodinger/zstd-v1.5.5-boost-1_81_0-BLDMGR-7247/lib ./Code/GraphMol/NewCIPLabeler/testNewCIPLabeler_pdb:*)",
+      "Bash(ls:*)"
     ]
   }
 }

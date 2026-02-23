@@ -1,35 +1,44 @@
 //
 //  Test NewCIPLabeler with PDB files
 //
-//  Usage: test_pdb <file.pdb>
+//  Usage: test_pdb <file1.pdb> [file2.pdb ...]
+//  Supports multiple files and glob patterns
 //
 
 #include <iostream>
 #include <chrono>
+#include <string>
+#include <exception>
 #include <GraphMol/FileParsers/FileParsers.h>
 #include <GraphMol/SmilesParse/SmilesWrite.h>
+#include <GraphMol/RDKitBase.h>
 #include "NewCIPLabeler.h"
 
 using namespace RDKit;
 using namespace std::chrono;
 
-int main(int argc, char** argv) {
-  if (argc < 2) {
-    std::cerr << "Usage: " << argv[0] << " <file.pdb>\n";
-    return 1;
-  }
-
-  std::string pdb_file = argv[1];
+bool processPDBFile(const std::string& pdb_file, bool wait_for_profiler) {
+  std::cout << "\n" << std::string(80, '=') << "\n";
   std::cout << "Reading PDB file: " << pdb_file << "\n";
 
   // Read PDB file
   auto start_parse = high_resolution_clock::now();
-  std::unique_ptr<RWMol> mol(PDBFileToMol(pdb_file));
+  std::unique_ptr<RWMol> mol;
+
+  try {
+    mol.reset(PDBFileToMol(pdb_file));
+  } catch (const std::exception& e) {
+    std::cerr << "ERROR: Failed to parse PDB file: " << e.what() << "\n";
+    std::cerr << "Skipping this file.\n";
+    return false;
+  }
+
   auto end_parse = high_resolution_clock::now();
 
   if (!mol) {
-    std::cerr << "Failed to parse PDB file\n";
-    return 1;
+    std::cerr << "ERROR: Failed to parse PDB file (returned null)\n";
+    std::cerr << "Skipping this file.\n";
+    return false;
   }
 
   auto parse_time = duration_cast<milliseconds>(end_parse - start_parse);
@@ -65,13 +74,15 @@ int main(int argc, char** argv) {
 
   if (tetrahedral_count == 0 && double_bond_count == 0) {
     std::cout << "\nNo stereocenters found - nothing to label\n";
-    return 0;
+    return true;  // Still successful, just nothing to do
   }
 
-  // Wait for user to attach profiler
-  std::cout << "\nReady to run CIP labeling.\n";
-  std::cout << "Press Enter to continue (attach profiler now if needed)...";
-  std::cin.get();
+  // Wait for user to attach profiler (only for first file)
+  if (wait_for_profiler) {
+    std::cout << "\nReady to run CIP labeling.\n";
+    std::cout << "Press Enter to continue (attach profiler now if needed)...";
+    std::cin.get();
+  }
 
   // Run CIP labeling
   std::cout << "\nRunning CIP labeling...\n";
@@ -81,10 +92,10 @@ int main(int argc, char** argv) {
     NewCIPLabeler::assignCIPLabels(*mol);
   } catch (const NewCIPLabeler::MaxIterationsExceeded& e) {
     std::cerr << "ERROR: " << e.what() << "\n";
-    return 1;
+    return false;
   } catch (const std::exception& e) {
     std::cerr << "ERROR: " << e.what() << "\n";
-    return 1;
+    return false;
   }
 
   auto end_cip = high_resolution_clock::now();
@@ -168,5 +179,45 @@ int main(int argc, char** argv) {
     std::cout << "  Rate: " << (1000000.0 / us_per_center) << " centers/sec\n";
   }
 
-  return 0;
+  return true;
+}
+
+int main(int argc, char** argv) {
+  if (argc < 2) {
+    std::cerr << "Usage: " << argv[0] << " <file1.pdb> [file2.pdb ...]\n";
+    std::cerr << "Process one or more PDB files (use glob patterns)\n";
+    return 1;
+  }
+
+  int total_files = argc - 1;
+  int successful = 0;
+  int failed = 0;
+
+  std::cout << "Processing " << total_files << " PDB file(s)...\n";
+
+  for (int i = 1; i < argc; ++i) {
+    bool wait_for_profiler = (i == 1);  // Only wait on first file
+
+    try {
+      bool success = processPDBFile(argv[i], wait_for_profiler);
+      if (success) {
+        successful++;
+      } else {
+        failed++;
+      }
+    } catch (const std::exception& e) {
+      std::cerr << "\nFATAL ERROR processing " << argv[i] << ": " << e.what() << "\n";
+      std::cerr << "Skipping this file.\n";
+      failed++;
+    }
+  }
+
+  // Summary
+  std::cout << "\n" << std::string(80, '=') << "\n";
+  std::cout << "Summary:\n";
+  std::cout << "  Total files: " << total_files << "\n";
+  std::cout << "  Successful: " << successful << "\n";
+  std::cout << "  Failed: " << failed << "\n";
+
+  return (failed == total_files) ? 1 : 0;
 }
