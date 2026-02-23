@@ -114,22 +114,36 @@ int main(int argc, char** argv) {
   std::cout << "  Labeled atoms: " << labeled_atoms << " / " << tetrahedral_count << "\n";
   std::cout << "  Labeled bonds: " << labeled_bonds << " / " << double_bond_count << "\n";
 
-  // Show first few labels as examples
+  // Show atom labels
   if (labeled_atoms > 0) {
-    std::cout << "\nExample atom labels:\n";
+    std::cout << "\nAtom labels";
+    if (labeled_atoms > 50) {
+      std::cout << " (showing first 50 of " << labeled_atoms << ")";
+    }
+    std::cout << ":\n";
+
     int shown = 0;
     for (auto& atom : mol->atoms()) {
       std::string code;
       if (atom->getPropIfPresent(common_properties::_CIPCode, code)) {
         std::cout << "  Atom " << atom->getIdx() << " ("
                   << atom->getSymbol() << "): " << code << "\n";
-        if (++shown >= 10) break;
+        if (++shown >= 50) break;
       }
+    }
+
+    if (labeled_atoms > 50) {
+      std::cout << "  ... and " << (labeled_atoms - 50) << " more\n";
     }
   }
 
   if (labeled_bonds > 0) {
-    std::cout << "\nExample bond labels:\n";
+    std::cout << "\nBond labels";
+    if (labeled_bonds > 50) {
+      std::cout << " (showing first 50 of " << labeled_bonds << ")";
+    }
+    std::cout << ":\n";
+
     int shown = 0;
     for (auto& bond : mol->bonds()) {
       std::string code;
@@ -137,8 +151,12 @@ int main(int argc, char** argv) {
         std::cout << "  Bond " << bond->getIdx() << " ("
                   << bond->getBeginAtom()->getSymbol() << "-"
                   << bond->getEndAtom()->getSymbol() << "): " << code << "\n";
-        if (++shown >= 10) break;
+        if (++shown >= 50) break;
       }
+    }
+
+    if (labeled_bonds > 50) {
+      std::cout << "  ... and " << (labeled_bonds - 50) << " more\n";
     }
   }
 
