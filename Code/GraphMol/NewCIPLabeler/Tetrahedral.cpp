@@ -136,6 +136,20 @@ void labelTetrahedralCenter(ROMol& mol, Atom* center, uint32_t max_iters) {
     subs.emplace_back();
     subs.back().root_atom = nullptr;  // nullptr represents implicit H
     subs.back().connecting_bond = nullptr;
+    subs.back().is_lone_pair = false;
+  }
+
+  // Add lone pair for atoms that need it (P, As, N, S, etc.)
+  // These elements can be tetrahedral with 3 bonded substituents + 1 lone pair
+  if (subs.size() == 3) {
+    int atomic_num = center->getAtomicNum();
+    // Phosphorus (15), Arsenic (33), Nitrogen (7), Sulfur (16)
+    if (atomic_num == 15 || atomic_num == 33 || atomic_num == 7 || atomic_num == 16) {
+      subs.emplace_back();
+      subs.back().root_atom = nullptr;
+      subs.back().connecting_bond = nullptr;
+      subs.back().is_lone_pair = true;  // Lone pair has lowest CIP priority
+    }
   }
 
   if (subs.size() != 4) {

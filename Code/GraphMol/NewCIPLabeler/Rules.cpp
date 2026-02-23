@@ -64,8 +64,13 @@ bool tryConstitutionalRanking(const ROMol& mol,
     const Atom* atom = subs[i].root_atom;
 
     if (atom == nullptr) {
-      // Implicit H
-      priorities.emplace_back(1001, i);  // Z=1, mass=1
+      if (subs[i].is_lone_pair) {
+        // Lone pair has lowest priority (Z=0)
+        priorities.emplace_back(0, i);
+      } else {
+        // Implicit H (Z=1, mass=1)
+        priorities.emplace_back(1001, i);
+      }
     } else {
       int z = atom->getAtomicNum();
       auto* pt = PeriodicTable::getTable();
@@ -129,8 +134,14 @@ bool applyRankingRules(const ROMol& mol,
 
         int descriptor;
         if (atom == nullptr) {
-          // Implicit H
-          descriptor = 1001000 + mult;  // Z=1, mass=1, mult
+          // Check if this is a lone pair or implicit H
+          if (subs[i].is_lone_pair) {
+            // Lone pair: Z=0 (lowest priority)
+            descriptor = mult;
+          } else {
+            // Implicit H: Z=1, mass=1
+            descriptor = 1001000 + mult;
+          }
         } else {
           int z = atom->getAtomicNum();
           auto* pt = PeriodicTable::getTable();
