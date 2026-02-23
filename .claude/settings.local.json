@@ -19,7 +19,8 @@
       "Bash(/tmp/test_ethyl.cpp:*)",
       "Bash(git checkout:*)",
       "Bash(make:*)",
-      "Bash(./build_and_test.sh:*)"
+      "Bash(./build_and_test.sh:*)",
+      "Bash(/tmp/perf_summary.md:*)"
     ]
   }
 }
