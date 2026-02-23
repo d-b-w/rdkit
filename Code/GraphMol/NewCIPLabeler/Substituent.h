@@ -36,6 +36,7 @@ struct Substituent {
   const Atom* root_atom;           // Immediate neighbor (nullptr for implicit H/lone pair)
   const Bond* connecting_bond;     // Bond to center (nullptr for implicit H/lone pair)
   std::vector<AtomShell> shells;   // Expanded shells (lazy)
+  std::vector<int> comparison_key; // Incrementally built CIP comparison key
   int final_rank = -1;             // Assigned rank (-1 if not yet ranked)
   bool is_lone_pair = false;       // True if this is a lone pair (lower priority than H)
 

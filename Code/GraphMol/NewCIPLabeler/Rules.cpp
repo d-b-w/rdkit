@@ -105,76 +105,78 @@ bool applyRankingRules(const ROMol& mol,
                        std::vector<Substituent>& subs,
                        uint32_t shell_depth) {
   // Implement CIP Rule 2: Compare paths incrementally
-  // At each shell, create a sorted list of atomic descriptors considering multiplicities
+  // OPTIMIZATION: Build comparison keys incrementally by only processing NEW shell
 
   // Note: Substituents can have different numbers of shells (e.g., implicit H stops at shell 0)
   // Missing shells are treated as empty, which makes those subs lower priority
 
-  // Build comparison keys for each substituent considering ALL shells up to depth
-  std::vector<std::pair<std::vector<int>, size_t>> keys;
+  // Append descriptors for the NEW shell to each substituent's comparison_key
+  for (size_t i = 0; i < subs.size(); ++i) {
+    // Skip if this substituent doesn't have this shell yet
+    if (shell_depth >= subs[i].shells.size()) {
+      continue;
+    }
+
+    const auto& shell = subs[i].shells[shell_depth];
+
+    // Create atom descriptors with multiplicities for THIS shell only
+    std::vector<int> shell_descriptors;
+    shell_descriptors.reserve(shell.atoms.size());
+
+    for (size_t j = 0; j < shell.atoms.size(); ++j) {
+      const Atom* atom = shell.atoms[j];
+      uint32_t mult = shell.multiplicities[j];
+
+      int descriptor;
+      if (atom == nullptr) {
+        // Check if this is a lone pair or implicit H
+        if (subs[i].is_lone_pair) {
+          // Lone pair: Z=0 (lowest priority)
+          descriptor = mult;
+        } else {
+          // Implicit H: Z=1, mass=1
+          descriptor = 1001000 + mult;
+        }
+      } else {
+        int z = atom->getAtomicNum();
+        auto* pt = PeriodicTable::getTable();
+        unsigned int mass = atom->getIsotope() ? atom->getIsotope() :
+            static_cast<unsigned int>(pt->getMostCommonIsotopeMass(z));
+
+        // Encode as: Z * 1000000 + mass * 1000 + multiplicity
+        // Multiplicity 0 means duplicate (ring closure)
+        descriptor = z * 1000000 + static_cast<int>(mass) * 1000 + static_cast<int>(mult);
+      }
+
+      shell_descriptors.push_back(descriptor);
+    }
+
+    // Sort descriptors for this shell (descending = higher priority first)
+    std::sort(shell_descriptors.rbegin(), shell_descriptors.rend());
+
+    // Append to existing comparison key (INCREMENTAL!)
+    subs[i].comparison_key.insert(subs[i].comparison_key.end(),
+                                   shell_descriptors.begin(),
+                                   shell_descriptors.end());
+  }
+
+  // Build sorting vector with references to existing keys
+  std::vector<std::pair<const std::vector<int>*, size_t>> keys;
   keys.reserve(subs.size());
 
   for (size_t i = 0; i < subs.size(); ++i) {
-    std::vector<int> key;
-
-    // Collect atoms from all shells up to and including current depth
-    // Each atom contributes (Z * 1000000 + mass * 1000 + multiplicity)
-    for (uint32_t depth = 0; depth <= shell_depth; ++depth) {
-      if (depth >= subs[i].shells.size()) {
-        break;
-      }
-
-      const auto& shell = subs[i].shells[depth];
-
-      // Create atom descriptors with multiplicities
-      std::vector<int> shell_descriptors;
-      for (size_t j = 0; j < shell.atoms.size(); ++j) {
-        const Atom* atom = shell.atoms[j];
-        uint32_t mult = shell.multiplicities[j];
-
-        int descriptor;
-        if (atom == nullptr) {
-          // Check if this is a lone pair or implicit H
-          if (subs[i].is_lone_pair) {
-            // Lone pair: Z=0 (lowest priority)
-            descriptor = mult;
-          } else {
-            // Implicit H: Z=1, mass=1
-            descriptor = 1001000 + mult;
-          }
-        } else {
-          int z = atom->getAtomicNum();
-          auto* pt = PeriodicTable::getTable();
-          unsigned int mass = atom->getIsotope() ? atom->getIsotope() :
-              static_cast<unsigned int>(pt->getMostCommonIsotopeMass(z));
-
-          // Encode as: Z * 1000000 + mass * 1000 + multiplicity
-          // Multiplicity 0 means duplicate (ring closure)
-          descriptor = z * 1000000 + static_cast<int>(mass) * 1000 + static_cast<int>(mult);
-        }
-
-        shell_descriptors.push_back(descriptor);
-      }
-
-      // Sort descriptors for this shell (descending = higher priority first)
-      std::sort(shell_descriptors.rbegin(), shell_descriptors.rend());
-
-      // Append to overall key
-      key.insert(key.end(), shell_descriptors.begin(), shell_descriptors.end());
-    }
-
-    keys.emplace_back(std::move(key), i);
+    keys.emplace_back(&subs[i].comparison_key, i);
   }
 
   // Sort substituents by their keys (lexicographic, reverse for CIP priority)
   std::sort(keys.begin(), keys.end(),
             [](const auto& a, const auto& b) {
-              return a.first > b.first;
+              return *a.first > *b.first;
             });
 
   // Check for ties
   for (size_t i = 1; i < keys.size(); ++i) {
-    if (keys[i].first == keys[i-1].first) {
+    if (*keys[i].first == *keys[i-1].first) {
       return false;  // Still have ties, need more shells
     }
   }
