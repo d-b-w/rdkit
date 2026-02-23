@@ -68,6 +68,11 @@ int main(int argc, char** argv) {
     return 0;
   }
 
+  // Wait for user to attach profiler
+  std::cout << "\nReady to run CIP labeling.\n";
+  std::cout << "Press Enter to continue (attach profiler now if needed)...";
+  std::cin.get();
+
   // Run CIP labeling
   std::cout << "\nRunning CIP labeling...\n";
   auto start_cip = high_resolution_clock::now();
