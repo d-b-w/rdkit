@@ -15,6 +15,7 @@
 #include <RDGeneral/BoostStartInclude.h>
 #include <boost/dynamic_bitset.hpp>
 #include <RDGeneral/BoostEndInclude.h>
+#include "Descriptor.h"
 
 namespace RDKit {
 
@@ -29,6 +30,7 @@ struct AtomShell {
   uint32_t distance;
   std::vector<const Atom*> atoms;
   std::vector<uint32_t> multiplicities;  // Bond order duplicates
+  std::vector<Descriptor> stereo_labels;  // R/S/E/Z labels for Rule 5
 };
 
 // One substituent extending from a stereocenter

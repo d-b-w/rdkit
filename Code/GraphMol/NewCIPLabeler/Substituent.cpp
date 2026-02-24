@@ -9,11 +9,30 @@
 //
 
 #include "Substituent.h"
+#include "Descriptor.h"
 #include <GraphMol/RDKitBase.h>
 #include <RDGeneral/Invariant.h>
 
 namespace RDKit {
 namespace NewCIPLabeler {
+
+namespace {
+
+// Capture stereo label from an atom (for Rule 5)
+Descriptor captureAtomLabel(const Atom* atom) {
+  if (atom == nullptr) {
+    return Descriptor::NONE;
+  }
+
+  std::string code;
+  if (atom->getPropIfPresent(common_properties::_CIPCode, code)) {
+    return descriptorFromString(code);
+  }
+
+  return Descriptor::NONE;
+}
+
+}  // namespace
 
 void Substituent::expandNextShell(const ROMol& mol,
                                   boost::dynamic_bitset<>& visited) {
@@ -21,7 +40,7 @@ void Substituent::expandNextShell(const ROMol& mol,
   if (root_atom == nullptr) {
     if (shells.empty()) {
       // Shell 0 for implicit H: single hydrogen atom (conceptual)
-      AtomShell shell{0, {nullptr}, {1}};
+      AtomShell shell{0, {nullptr}, {1}, {Descriptor::NONE}};
       shells.push_back(std::move(shell));
     }
     // Hydrogen has no further shells
@@ -29,12 +48,13 @@ void Substituent::expandNextShell(const ROMol& mol,
   }
 
   uint32_t new_shell_idx = static_cast<uint32_t>(shells.size());
-  AtomShell new_shell{new_shell_idx, {}, {}};
+  AtomShell new_shell{new_shell_idx, {}, {}, {}};
 
   if (new_shell_idx == 0) {
     // Shell 0: just the root atom
     new_shell.atoms.push_back(root_atom);
     new_shell.multiplicities.push_back(1);
+    new_shell.stereo_labels.push_back(captureAtomLabel(root_atom));
     visited.set(root_atom->getIdx());
   } else {
     // Expand from previous shell
@@ -68,6 +88,7 @@ void Substituent::expandNextShell(const ROMol& mol,
           // Ring closure - add as duplicate node with multiplicity 0
           new_shell.atoms.push_back(nbr);
           new_shell.multiplicities.push_back(0);
+          new_shell.stereo_labels.push_back(captureAtomLabel(nbr));
           continue;
         }
 
@@ -98,6 +119,7 @@ void Substituent::expandNextShell(const ROMol& mol,
 
         new_shell.atoms.push_back(nbr);
         new_shell.multiplicities.push_back(parent_mult * bond_order);
+        new_shell.stereo_labels.push_back(captureAtomLabel(nbr));
         visited.set(nbr->getIdx());
       }
     }

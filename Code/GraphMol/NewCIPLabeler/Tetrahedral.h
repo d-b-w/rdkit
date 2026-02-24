@@ -20,7 +20,8 @@ class Atom;
 namespace NewCIPLabeler {
 
 // Label a tetrahedral stereocenter with R/S descriptor
-void labelTetrahedralCenter(ROMol& mol, Atom* center, uint32_t max_iters);
+// use_rule5: enable CIP Rule 5 for pseudo-asymmetry detection
+void labelTetrahedralCenter(ROMol& mol, Atom* center, uint32_t max_iters, bool use_rule5 = true);
 
 }  // namespace NewCIPLabeler
 }  // namespace RDKit

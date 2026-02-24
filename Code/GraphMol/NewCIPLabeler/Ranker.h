@@ -21,10 +21,12 @@ namespace NewCIPLabeler {
 
 // Core ranking function - attempts to uniquely rank all substituents
 // using lazy shell expansion up to max_shells depth
+// use_rule5: enable CIP Rule 5 (stereochemical comparison) for pseudo-asymmetry
 CenterRanking rankSubstituents(const ROMol& mol,
                                const Atom* center,
                                std::vector<Substituent>& subs,
-                               uint32_t max_shells);
+                               uint32_t max_shells,
+                               bool use_rule5 = true);
 
 // Build final ranking result from ranked substituents
 CenterRanking buildRankingResult(const std::vector<Substituent>& subs,

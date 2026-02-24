@@ -143,16 +143,33 @@ void assignCIPLabels(ROMol &mol,
   // Sort by complexity (simple first)
   stereo_atoms = sortByComplexity(stereo_atoms, mol);
 
-  // Process each stereocenter
+  // PASS 1: Label simple centers without Rule 5
+  // This establishes baseline labels that complex centers can use
   for (auto* atom : stereo_atoms) {
     try {
-      labelTetrahedralCenter(mol, atom, maxRecursiveIterations);
+      labelTetrahedralCenter(mol, atom, maxRecursiveIterations, /*use_rule5=*/false);
     } catch (const MaxIterationsExceeded&) {
-      // Let it propagate up
-      throw;
+      // Expected for complex centers - skip for now
+      continue;
     } catch (const std::exception& e) {
       // Silently skip atoms that fail labeling
-      // This matches old CIPLabeler behavior
+      continue;
+    }
+  }
+
+  // PASS 2: Label remaining centers with Rule 5 (using labels from Pass 1)
+  for (auto* atom : stereo_atoms) {
+    if (atom->hasProp(common_properties::_CIPCode)) {
+      continue;  // Already labeled in Pass 1
+    }
+
+    try {
+      labelTetrahedralCenter(mol, atom, maxRecursiveIterations, /*use_rule5=*/true);
+    } catch (const MaxIterationsExceeded&) {
+      // Truly cannot resolve - skip
+      continue;
+    } catch (const std::exception& e) {
+      // Silently skip atoms that fail labeling
       continue;
     }
   }
@@ -162,8 +179,8 @@ void assignCIPLabels(ROMol &mol,
     try {
       labelDoubleBond(mol, bond, maxRecursiveIterations);
     } catch (const MaxIterationsExceeded&) {
-      // Let it propagate up
-      throw;
+      // Skip if cannot resolve
+      continue;
     } catch (const std::exception& e) {
       // Silently skip bonds that fail labeling
       continue;

@@ -119,7 +119,7 @@ Descriptor computeTetrahedralDescriptor(const ROMol& mol,
 
 }  // namespace
 
-void labelTetrahedralCenter(ROMol& mol, Atom* center, uint32_t max_iters) {
+void labelTetrahedralCenter(ROMol& mol, Atom* center, uint32_t max_iters, bool use_rule5) {
   // Collect substituents
   std::vector<Substituent> subs;
 
@@ -158,7 +158,7 @@ void labelTetrahedralCenter(ROMol& mol, Atom* center, uint32_t max_iters) {
   // Rank substituents
   CenterRanking ranking;
   try {
-    ranking = rankSubstituents(mol, center, subs, max_iters);
+    ranking = rankSubstituents(mol, center, subs, max_iters, use_rule5);
   } catch (const MaxIterationsExceeded& e) {
     // Hit max iterations - likely a perfectly symmetric structure
     // Just skip this center (no label assigned)

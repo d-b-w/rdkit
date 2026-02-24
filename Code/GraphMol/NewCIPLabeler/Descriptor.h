@@ -40,5 +40,8 @@ enum class Descriptor {
 // Convert descriptor to string for storage in molecule properties
 RDKIT_NEWCIPLABELER_EXPORT std::string to_string(Descriptor desc);
 
+// Parse string back to descriptor (for Rule 5)
+RDKIT_NEWCIPLABELER_EXPORT Descriptor descriptorFromString(const std::string& str);
+
 }  // namespace NewCIPLabeler
 }  // namespace RDKit

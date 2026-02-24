@@ -21,7 +21,8 @@ namespace NewCIPLabeler {
 CenterRanking rankSubstituents(const ROMol& mol,
                                const Atom* center,
                                std::vector<Substituent>& subs,
-                               uint32_t max_shells) {
+                               uint32_t max_shells,
+                               bool use_rule5) {
   if (subs.empty()) {
     return CenterRanking{true, false, {}};
   }
@@ -46,6 +47,8 @@ CenterRanking rankSubstituents(const ROMol& mol,
   // If max_shells is 0, use reasonable default
   uint32_t max_iter = (max_shells == 0) ? HARD_MAX_SHELLS : std::min(max_shells, HARD_MAX_SHELLS);
 
+  bool is_pseudo = false;
+
   for (uint32_t shell = 0; shell < max_iter; ++shell) {
     // Expand all substituents to this shell
     for (size_t i = 0; i < subs.size(); ++i) {
@@ -57,8 +60,15 @@ CenterRanking rankSubstituents(const ROMol& mol,
     // Apply CIP rules at this depth
     bool resolved = applyRankingRules(mol, subs, shell);
     if (resolved) {
-      bool is_pseudo = checkPseudoAsymmetry(subs);
       return buildRankingResult(subs, is_pseudo);
+    }
+
+    // If normal rules failed and Rule 5 is enabled, try stereochemical comparison
+    if (use_rule5) {
+      resolved = applyRule5(mol, subs, shell, is_pseudo);
+      if (resolved) {
+        return buildRankingResult(subs, is_pseudo);
+      }
     }
 
     // Debug: warn if taking too long

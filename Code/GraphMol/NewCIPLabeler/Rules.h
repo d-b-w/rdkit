@@ -29,6 +29,13 @@ bool applyRankingRules(const ROMol& mol,
                        std::vector<Substituent>& subs,
                        uint32_t shell_depth);
 
+// Apply CIP Rule 5 (stereochemical comparison) when normal rules fail
+// Returns true if all substituents are uniquely ranked, sets is_pseudo if detected
+bool applyRule5(const ROMol& mol,
+                std::vector<Substituent>& subs,
+                uint32_t shell_depth,
+                bool& is_pseudo);
+
 // Check if the configuration represents pseudo-asymmetry
 bool checkPseudoAsymmetry(const std::vector<Substituent>& subs);
 
