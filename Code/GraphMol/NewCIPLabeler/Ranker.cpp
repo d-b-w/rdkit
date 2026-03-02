@@ -42,7 +42,7 @@ CenterRanking rankSubstituents(const ROMol& mol,
   }
 
   // Safety limits: prevent infinite loops on pathological molecules
-  constexpr uint32_t HARD_MAX_SHELLS = 200;
+  constexpr uint32_t HARD_MAX_SHELLS = 10000;
 
   // If max_shells is 0, use reasonable default
   uint32_t max_iter = (max_shells == 0) ? HARD_MAX_SHELLS : std::min(max_shells, HARD_MAX_SHELLS);
@@ -72,21 +72,21 @@ CenterRanking rankSubstituents(const ROMol& mol,
     }
 
     // Debug: warn if taking too long
-    if (shell == 20 || shell == 50 || shell == 100 || shell == 150) {
-      std::cerr << "WARNING: CIP ranking at center " << center->getIdx()
-                << " reached shell " << shell << " without resolving\n";
-      std::cerr << "  Center atom: " << center->getSymbol()
-                << " with " << subs.size() << " substituents\n";
-      for (size_t i = 0; i < subs.size(); ++i) {
-        std::cerr << "    Sub[" << i << "]: ";
-        if (subs[i].root_atom == nullptr) {
-          std::cerr << (subs[i].is_lone_pair ? "LP" : "implH");
-        } else {
-          std::cerr << subs[i].root_atom->getSymbol() << " (idx=" << subs[i].root_atom->getIdx() << ")";
-        }
-        std::cerr << " - " << subs[i].shells.size() << " shells expanded\n";
-      }
-    }
+    // if (shell == 20 || shell == 50 || shell == 100 || shell == 150) {
+    //   std::cerr << "WARNING: CIP ranking at center " << center->getIdx()
+    //             << " reached shell " << shell << " without resolving\n";
+    //   std::cerr << "  Center atom: " << center->getSymbol()
+    //             << " with " << subs.size() << " substituents\n";
+    //   for (size_t i = 0; i < subs.size(); ++i) {
+    //     std::cerr << "    Sub[" << i << "]: ";
+    //     if (subs[i].root_atom == nullptr) {
+    //       std::cerr << (subs[i].is_lone_pair ? "LP" : "implH");
+    //     } else {
+    //       std::cerr << subs[i].root_atom->getSymbol() << " (idx=" << subs[i].root_atom->getIdx() << ")";
+    //     }
+    //     std::cerr << " - " << subs[i].shells.size() << " shells expanded\n";
+    //   }
+    // }
   }
 
   // Exceeded max iterations - provide diagnostic info

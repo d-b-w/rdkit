@@ -289,13 +289,17 @@ bool Shells::makeNextShell()
     for (auto& a : shells.back() | std::views::join) {
         const auto next_group_start = atoms.size();
 
+        // but what neighbors are these?
+        // likely the bonds of the RDK native atom
+        // Make sure to double double-bonds here. And this
+        // whole mancude averaging thing
         for (auto n: a.neighbors) {
             if (n == a.parent) {continue;}
             // check for loop closure and other fake nodes
-            if (ever_visited[n.atom->getIdx()]) {
+        if (ever_visited[n.atom->getIdx()]) {
                 // check the path back
             }
-            //
+            //add an atom
             atoms.emplace_back {
                 n
                 .depth=depth
@@ -304,6 +308,7 @@ bool Shells::makeNextShell()
         // add implicit H nodes
         neighbor_groups_idx.emplace_back(next_group_start, atoms.size());
         neighbor_groups.emplace_back(atoms.begin() + next_group_start, atoms.end());
+        a.children = neighbor_groups.back();
     }
     shells_idx.emplace_back(shell_start, neighbor_groups.size() - shell_start);
     shells.emplace_back(neighbor_groups.begin() + shell_start, neighbor_groups.end());

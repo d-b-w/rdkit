@@ -20,3 +20,7 @@ Development should follow a TDD approach, running successively more rigorous tes
 
 ## Safety
 This code will include graph searching - it's easy to accidentally write infinite loops in graph search problems. It's OK to write hard depth limits on searches until the implementation is complete. It is also important to time-out test execution externally.
+
+1. For which steps is valid to incrementally build the digraph?
+2. For rule 3 - is E/Z a _global_ E/Z, or E/Z from the perspective of the incoming graph search?
+3. For rule 4a - The rules before 4a don't talk about pseudo-chiral. How can there be a pseudo-chiral node at this point? (I beleive there is, I just don't understand why)

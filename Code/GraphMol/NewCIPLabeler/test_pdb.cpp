@@ -12,12 +12,18 @@
 #include <GraphMol/FileParsers/FileParsers.h>
 #include <GraphMol/SmilesParse/SmilesWrite.h>
 #include <GraphMol/RDKitBase.h>
+#include <GraphMol/CIPLabeler/CIPLabeler.h>
 #include "NewCIPLabeler.h"
 
 using namespace RDKit;
 using namespace std::chrono;
 
-bool processPDBFile(const std::string& pdb_file, bool wait_for_profiler) {
+using NewCIPLabeler::assignCIPLabels;
+using NewCIPLabeler::MaxIterationsExceeded;
+// using CIPLabeler::assignCIPLabels;
+// using CIPLabeler::MaxIterationsExceeded;
+
+bool processPDBFile(const std::string& pdb_file) {
   std::cout << "\n" << std::string(80, '=') << "\n";
   std::cout << "Reading PDB file: " << pdb_file << "\n";
 
@@ -77,20 +83,13 @@ bool processPDBFile(const std::string& pdb_file, bool wait_for_profiler) {
     return true;  // Still successful, just nothing to do
   }
 
-  // Wait for user to attach profiler (only for first file)
-  if (wait_for_profiler) {
-    std::cout << "\nReady to run CIP labeling.\n";
-    std::cout << "Press Enter to continue (attach profiler now if needed)...";
-    std::cin.get();
-  }
-
   // Run CIP labeling
   std::cout << "\nRunning CIP labeling...\n";
   auto start_cip = high_resolution_clock::now();
 
   try {
-    NewCIPLabeler::assignCIPLabels(*mol);
-  } catch (const NewCIPLabeler::MaxIterationsExceeded& e) {
+    assignCIPLabels(*mol);
+  } catch (const MaxIterationsExceeded& e) {
     std::cerr << "ERROR: " << e.what() << "\n";
     return false;
   } catch (const std::exception& e) {
@@ -128,8 +127,8 @@ bool processPDBFile(const std::string& pdb_file, bool wait_for_profiler) {
   // Show atom labels
   if (labeled_atoms > 0) {
     std::cout << "\nAtom labels";
-    if (labeled_atoms > 50) {
-      std::cout << " (showing first 50 of " << labeled_atoms << ")";
+    if (labeled_atoms > 5) {
+      std::cout << " (showing first 5 of " << labeled_atoms << ")";
     }
     std::cout << ":\n";
 
@@ -139,19 +138,19 @@ bool processPDBFile(const std::string& pdb_file, bool wait_for_profiler) {
       if (atom->getPropIfPresent(common_properties::_CIPCode, code)) {
         std::cout << "  Atom " << atom->getIdx() << " ("
                   << atom->getSymbol() << "): " << code << "\n";
-        if (++shown >= 50) break;
+        if (++shown >= 5) break;
       }
     }
 
-    if (labeled_atoms > 50) {
-      std::cout << "  ... and " << (labeled_atoms - 50) << " more\n";
+    if (labeled_atoms > 5) {
+      std::cout << "  ... and " << (labeled_atoms - 5) << " more\n";
     }
   }
 
   if (labeled_bonds > 0) {
     std::cout << "\nBond labels";
-    if (labeled_bonds > 50) {
-      std::cout << " (showing first 50 of " << labeled_bonds << ")";
+    if (labeled_bonds > 5) {
+      std::cout << " (showing first 5 of " << labeled_bonds << ")";
     }
     std::cout << ":\n";
 
@@ -162,12 +161,12 @@ bool processPDBFile(const std::string& pdb_file, bool wait_for_profiler) {
         std::cout << "  Bond " << bond->getIdx() << " ("
                   << bond->getBeginAtom()->getSymbol() << "-"
                   << bond->getEndAtom()->getSymbol() << "): " << code << "\n";
-        if (++shown >= 50) break;
+        if (++shown >= 5) break;
       }
     }
 
-    if (labeled_bonds > 50) {
-      std::cout << "  ... and " << (labeled_bonds - 50) << " more\n";
+    if (labeled_bonds > 5) {
+      std::cout << "  ... and " << (labeled_bonds - 5) << " more\n";
     }
   }
 
@@ -176,6 +175,7 @@ bool processPDBFile(const std::string& pdb_file, bool wait_for_profiler) {
   if (labeled_atoms + labeled_bonds > 0) {
     double us_per_center = cip_time.count() / static_cast<double>(labeled_atoms + labeled_bonds);
     std::cout << "  Average: " << us_per_center << " µs per stereocenter\n";
+    std::cout << "  Total: " << cip_time.count() << " µs\n";
     std::cout << "  Rate: " << (1000000.0 / us_per_center) << " centers/sec\n";
   }
 
@@ -194,12 +194,14 @@ int main(int argc, char** argv) {
   int failed = 0;
 
   std::cout << "Processing " << total_files << " PDB file(s)...\n";
+  // Wait for user to attach profiler (only for first file)
+  std::cout << "\nReady to run CIP labeling.\n";
+  std::cout << "Press Enter to continue (attach profiler now if needed)...";
+  std::cin.get();
 
   for (int i = 1; i < argc; ++i) {
-    bool wait_for_profiler = (i == 1);  // Only wait on first file
-
     try {
-      bool success = processPDBFile(argv[i], wait_for_profiler);
+      bool success = processPDBFile(argv[i]);
       if (success) {
         successful++;
       } else {

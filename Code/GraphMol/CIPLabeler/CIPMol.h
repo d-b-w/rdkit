@@ -66,6 +66,8 @@ class CIPMolSpan {
 class CIPMol {
  public:
   CIPMol() = delete;
+  CIPMol(CIPMol&) = delete;
+  CIPMol(CIPMol&&) = default;
 
   explicit CIPMol(ROMol &mol);
 
@@ -97,6 +99,7 @@ class CIPMol {
   ROMol &d_mol;
   std::vector<RDKit::Bond::BondType> d_kekulized_bonds;
   std::vector<boost::rational<int>> d_atomnums;
+  std::vector<Bond*> d_mol_bonds;
 };
 
 }  // namespace CIPLabeler
