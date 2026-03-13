@@ -107,17 +107,24 @@ bool labelAux(std::vector<std::unique_ptr<Configuration>> &configs,
   std::vector<Node_Cfg_Pair> aux;
 
   auto &digraph = center->getDigraph();
+  // std::cerr << "digraph of size " << digraph.getNumNodes() << '\n';
   for (const auto &config : configs) {
     if (config == center) {
       continue;
     }
     // FIXME: specific to each descriptor
     const auto &foci = config->getFoci();
+    if (!digraph.seenAtom(foci[0])) {
+        continue;
+    }
     for (const auto &node : digraph.getNodes(foci[0])) {
       if (node->isDuplicate()) {
         continue;
       }
       auto low = node;
+      // if (center->getFocus()->getIdx() != 10055) {
+          // std::cerr << " Adding aux Labelling to " << node->getAtomIdx() + 1<< " for " << center->getFocus()->getIdx() + 1<< '\n';
+      // }
       if (foci.size() == 2) {
         for (const auto &edge : node->getEdges(foci[1])) {
           const auto &other_node = edge->getOther(node);
@@ -131,6 +138,8 @@ bool labelAux(std::vector<std::unique_ptr<Configuration>> &configs,
       }
     }
   }
+  // std::cerr << "digraph of size " << digraph.getNumNodes() << " after focus\n";
+
 
   auto farthest = [](const Node_Cfg_Pair &a, const Node_Cfg_Pair &b) {
     return a.first->getDistance() > b.first->getDistance();
@@ -208,7 +217,12 @@ void label(std::vector<std::unique_ptr<Configuration>> &configs,
     auto desc = conf->label(constitutional_rules);
     if (desc != Descriptor::UNKNOWN) {
       conf->setPrimaryLabel(desc);
+      std::cerr << "\e[1m LABELLED 2nd time\e[0m" << std::endl;
     } else {
+      auto focus = conf->getFocus();
+      // if (focus != nullptr) {
+      //     std::cerr << "Relabelling for center " << focus->getIdx() + 1 << std::endl;
+      // }
       if (labelAux(configs, all_rules, conf)) {
         desc = conf->label(all_rules);
 

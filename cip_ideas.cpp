@@ -4,23 +4,32 @@
 #include <ranges>
 #include <iterator>
 
-struct Mol {
 
-vector<Atom> atoms;
+// not sure if this is needed
+struct CIPMol {
 
-vector<int> original_indices;
+    vector<Atom> atoms;
+    vector<int> original_indices;
 
-CIPMol(ROMol& m) {
-    // populate atoms
-    // reorder atoms by connectivity
-}
+    CIPMol(ROMol& m) {
+        // populate atoms?
+        // reorder atoms by connectivity?
+    }
 
 };
 
 
-
 void label(ROMol mol) {
     CIPMol cip_mol(mol);
+
+    // find potential stereo
+    for (auto a: mol.atoms()) {
+
+    }
+    //
+    // do the consti
+    //
+    // sort
 
 }
 
@@ -39,108 +48,66 @@ void sort(v, indices, cmp)
 }
 
 
-template <T cmp>
-rank_ligands(mol, src, ligand1, ligand2)
-{
-    // These should be bonds because we only go one way
-    vector frontier1 = {{src, ligand1}};
-    vector frontier_groups1 = {{0, 1}};
-    vector frontier2 = {{src, ligand2}};
-    vector frontier_groups2 = {{0, 1}};
-
-    // two sets of frontiers because we always have "current"
-    // and "next". Swap 'em at each iteration
-    decltype(frontier1) next_frontier1;
-    decltype(frontier_groups1) next_frontier_groups1;
-    decltype(frontier2) next_frontier2;
-    decltype(frontier_groups2) next_frontier_groups2;
-
-    constexpr MAXDEPTH = 12;
-
-    auto res = SAME;
-    auto depth = 0;
-    while (res == SAME && depth < MAXDEPTH) {
-        for (auto s1, s2: zip(frontier1, frontier2)) {
-            auto a1 = span(this, s1);
-            auto a2 = span(this, s2);
-            std::ranges::sort(a1, cmp);
-            std::ranges::sort(a2, cmp);
-            res = cmp(a1, a2);
-            if (res != 0) {
-                return res;
-            }
-            // expand the shells
-            for (auto a: a1) {
-                auto start = next_frontier1.size();
-                for (auto n: a.neighbors) {
-                    next_frontier1.push_back(n);
-                    // Add a depth feature
-                    // check whether the node is a "duplicate" or "real" node
-                    // check here about "virtualization"
-                }
-                frontier_groups1.push_back({start, next_frontier1.size()});
-            }
-        }
-
-        // swap our working buffer for the next shell, clear space for the subsequent
-        // shell
-        std::swap(frontier1, next_frontier1);
-        std::swap(frontier2, next_frontier2);
-        std::swap(frontier_groups1, next_frontier_groups1);
-        std::swap(frontier_groups2, next_frontier_groups2);
-        next_frontier1.resize(0);
-        next_frontier2.resize(0);
-        next_frontier_groups1.resize(0);
-        next_frontier_groups2.resize(0);
-    }
-
-
-}
-
-
 enum class CMP {
 LESS, PSEUDO_LESS, EQUAL, PSEUDO_GREATER, GREATER
-}
-static constexpr auto EMPTY
+};
+static constexpr auto EMPTY = std::limits<size_t>::max;
+
+enum class BOND_DESCRIPTOR {
+    UNASSIGNED, NONE, Z, E
+};
+enum class ATOM_DESCRIPTOR {
+    UNASSIGNED, NONE, r, s, R, S
+};
+
 
 struct CIPAtom {
-uchar atomic_number; // this may be fractional due to averaging
-double mass_number; // this may be fractional due to averaging
-size_t depth;
-Descriptor descriptor;
-char flags; // ring duplicate, bond duplicate, implicit hydrogen
+    uchar atomic_number; // this may be fractional due to averaging
+    double mass_number; // this may be fractional due to averaging
+    size_t depth;
+    Descriptor descriptor;
+    Descriptor aux_descriptor;
+    // char flags; // ring duplicate, bond duplicate, implicit hydrogen
+    bool ring_duplicate = false;
+    bool bond_duplicate = false;
+    bool implicit_hydrogen = false;
 
-size_t parent = EMPTY;
-size_t idx = EMPTY;
-std::span<CIPAtom> children;
-Shells& mol;
+    size_t parent = EMPTY;
+    size_t idx = EMPTY;
+    uchar shell_rank = 0;
+    uchar cross_rank = 0;
 
-// link to the real atom
+    std::span<CIPAtom> children;
+    Shells& mol;
 
-bool isVisited(size_t i) const {
-    auto a = this;
-    while (a.idx != i && a.parent != EMPTY) {
-        a = &(a.mol.atoms[a.parent]);
+
+
+    // link to the real atom
+
+    bool isVisited(size_t i) const {
+        // if it's not in a ring, this isn't possible
+        auto a = this;
+        while (a.idx != i && a.parent != EMPTY) {
+            a = &(a.mol.atoms[a.parent]);
+        }
+        return a.idx == i;
     }
-    return a.idx == i;
-}
+
+    unsigned int ringClosureDepth(size_t i) const {
+        // if it's not in a ring, this isn't possible
+        auto a = this;
+        while (a.idx != i && a.parent != EMPTY) {
+            a = &(a.mol.atoms[a.parent]);
+        }
+        if (a.idx == i) {
+            return a.depth;
+        }
+        // not a ring closure
+        return std::limits<unsigned int>::max;
+    }
+
 };
 
-// actual atoms to iterate over.
-// maybe should be a span of Atom?
-stuct NeighborList
-{
-
-};
-
-stuct NextShell
-{
-bool empty() const;
-
-// some range adapter work here
-NeighborList* begin();
-NeighborList* end();
-};
 
 struct Shells;
 
@@ -192,18 +159,17 @@ private:
 
 struct Shells
 {
-    Shells(mol, src, ligand) {
-
-    }
+    Shells(const Atom* src, const Atom* ligand);
 
     // iterate over the shells out from something
     ShellIterator* begin() {return ShellIterator(this, false);}
     ShellIterator* end() {return ShellIterator(this, true);}
-
     std::span<std::span<CIPAtom>>* getShell(size_t idx);
+
+
     // allow re-use of the memory
-    // assign
-    // clear
+    void assign(const Atom* src, const Atom* ligand);
+    void clear()
 
 private:
     // populate the next shell and fix spans
@@ -214,11 +180,34 @@ private:
 
     std::vector<CIPAtom> atoms; // all atoms
     std::vector<std::span<CIPAtom>> neighbor_groups; // groups of neighbors of some atom
-    std::vector<std::array<size_t, 2> neighbor_groups_idx; // index-based for growing
     std::vector<std::span<std::span<CIPAtom>>> shells; // iterable of neighbor groups
-    std::vector<std::array<size_t, 2>> shells_idx; // index-based for growing
-
 };
+
+Shells::Shells(const Atom* src, const Atom* ligand)
+{
+    assign(src, ligand);
+}
+void Shells::assign(const Atom* src, const Atom* ligand)
+{
+    clear();
+
+    atoms.emplace_back(src, nullptr);
+    atoms.emplace_back(ligand, src);
+    ever_visited = {True, False};
+    neighbor_groups.emplace_back(atoms.begin() + 1, 1);
+    neighbor_groups_idx.emplace_back(1, 2);
+    shells.emplace_back(neighbor_groups.begin(), 1);
+    shells_idx.emplace_back(0, 1);
+}
+void Shells::clear()
+{
+    atoms.clear();
+    ever_visited.clear()
+    neighbor_groups.clear();
+    neighbor_groups_idx.clear();
+    shells.clear();
+    shells_idx.clear();
+}
 
 std::span<std::span<CIPAtom>>* Shells::getShell(size_t idx)
 {
@@ -240,38 +229,33 @@ bool Shells::reserveForNextShell()
         neighbors = a.neighbors.size() - 1; // ignore parent
         new_neighbor_group_count += 1 ? neighbors != 0 : 1;
         new_atom_count += neighbors;
+        // add duplicate nodes
+        // add implicit hydrogens
     }
     if (new_atom_count == 0) {
         return false;
     }
     const auto atoms_ptr = std::static_cast<void*>(atoms.data());
     atoms.reserve(atoms.size() + new_atom_count);
+    const auto new_atoms_offset = std::static_cast<void*>(atoms.data()) - atoms_ptr;
 
     const auto neighbor_groups_ptr = std::static_cast<void*>(neighbor_groups.data());
     neighbor_groups.reserve(neighbor_groups.size() + new_neighbor_group_count);
-    neighbor_groups_idx.reserve(neighbor_groups_idx.size() + new_neighbor_group_count);
     // reallocation, need to update span pointers
-    if (atoms_ptr != std::static_cast<void*>(atoms.data())) {
-        for (size_t i =0; i < neighbor_groups.size(); ++i) {
-            auto [b, e] = neighbor_groups_idx[i];
-            neighbor_groups[i] = std::span(atoms.begin() +b, atoms.begin() +e);
-            // reset children of the parent
-            if (!neighbor_groups.empty()) {
-                auto& parent = atoms[neighbor_groups[i].front().parent];
-                parent.children = neighbor_groups[i];
-            }
+    if (new_atoms_offset != 0) {
+        for (auto& g: neighbor_groups) {
+            g.data_ += new_atoms_offset;
+        }
+    }
+    const auto neighbor_groups_offset = std::static_cast<void*>(neighbor_groups.data());
+    shells.reserve(shells.size() + new_neighbor_group_count);
+    // reallocation, need to update span pointers
+    if (neighbor_groups_offset != 0) {
+        for (auto& s: shells) {
+            s.data_ += neighbor_groups_offset;
         }
     }
 
-    shells.reserve(shells.size() + new_neighbor_group_count);
-    shells_idx.reserve(shells_idx.size() + new_neighbor_group_count);
-    // reallocation, need to update span pointers
-    if (neighbor_groups_ptr != std::static_cast<void*>(neighbor_groups.data())) {
-        for (size_t i =0; i < shells.size(); ++i) {
-            auto [b, e] = shells_idx[i];
-            shells[i] = std::span(neighbor_groups.begin() +b, neighbor_groups.begin() +e);
-        }
-    }
     return true;
 }
 
@@ -291,19 +275,21 @@ bool Shells::makeNextShell()
 
         // but what neighbors are these?
         // likely the bonds of the RDK native atom
-        // Make sure to double double-bonds here. And this
+        // Make sure to double double-bonds here. And the
         // whole mancude averaging thing
         for (auto n: a.neighbors) {
             if (n == a.parent) {continue;}
+
             // check for loop closure and other fake nodes
-        if (ever_visited[n.atom->getIdx()]) {
-                // check the path back
-            }
+            // get ring closure depth here!
+            const bool is_ring_closure = ever_visited[n.atom->getIdx()] && n.isVisited();
+
             //add an atom
             atoms.emplace_back {
                 n
                 .depth=depth
             };
+            // double if double bond
         }
         // add implicit H nodes
         neighbor_groups_idx.emplace_back(next_group_start, atoms.size());
@@ -314,7 +300,6 @@ bool Shells::makeNextShell()
     shells.emplace_back(neighbor_groups.begin() + shell_start, neighbor_groups.end());
     return true;
 }
-
 
 
 /*
@@ -333,7 +318,8 @@ CMP sort_substituents(std::vector<CIPAtom>& substituents)
 
 
 // assume `Shells` understands how to build subsequent shell
-//
+// Currently templated on the function, could also template on an enum that
+// controls what function is called
 template <T cmp>
 CMP rank_ligands(shells1, shells2)
 {
@@ -352,8 +338,10 @@ CMP rank_ligands(shells1, shells2)
             if (!substituents1.empty() && substituents2.empty()) {
                 return CMP::GREATER;
             }
+            // how many layers does this need to be?
             std::ranges::sort(substituents1, cmp);
             std::ranges::sort(substituents2, cmp);
+            // I think it's the same ones as these
             res = cmp(substituents1, substituents2);
             if (res != CMP::EQUAL) {
                 return res;
@@ -363,18 +351,51 @@ CMP rank_ligands(shells1, shells2)
 }
 
 
-bool rule_1a(Atom a1, Atom a2) {
+// Rule 1a: Higher atomic number precedes lower.
+bool rule_1a(CIPAtom a1, CIPAtom a2) {
     return a1.atomic_number < a2.atomic_number;
 }
-bool rule_1b(Atom a1, Atom a2) {
-    if (a1.atomic_number < a2.atomic_number) {
-        return true;
-    } else if (a1.atomic_number > a2.atomic_number) {
-        return false;
-    }
+
+// Rule 1b (proposed): Lower root distance precedes higher root distance, where “root
+// distance” is defined: (a) in the case of ring-closure duplicate nodes as the sphere of
+// the duplicated atom; (b) in the case of multiple-bond duplicate nodes as the sphere of
+// the atom to which the duplicate node is attached; and (c) in all other cases as the
+// sphere of the atom itself.
+bool rule_1b(CIPAtom a1, CIPAtom a2) {
+    return a1.depth < a2.depth;
+}
+
+bool rule_2(CIPAtom a1, CIPAtom a2) {
     return a1.mass_number < a2.mass_number;
 }
 
+// Rule 3: When considering double bonds and planar tetraligand atoms, ‘seqcis’ = ‘Z’ precedes
+// ‘seqtrans’ = ‘E’, and this precedes nonstereogenic double bonds.
+bool rule_3(CIPAtom a1, CIPAtom a2) {
+    // require that bond descriptors are set
+    return a1.bond_descriptor < a2.bond_descriptor;
+}
+
+// Rule 4a: Chiral stereogenic units precede pseudoasymmetric stereogenic units, and these precede
+// nonstereogenic units.
+bool rule_4a(CIPAtom a1, CIPAtom a2) {
+    // require that atom descriptors are set
+    return a1.atom_descriptor / 2  < a2.atom_descriptor / 2;
+}
+
+
+// Rule 4b: When two ligands have different descriptor pairs, then the one with the first chosen like
+// descriptor pair has priority over the one with a corresponding unlike descriptor pair.
+// this is the crazy one
+
+// Rule 4c: ‘r’ precedes ‘s’ and ‘m’ precedes ‘p’.
+
+// Rule 5: An atom or group with descriptor ‘R’, ‘M’, or ‘seqCis’ has priority over its enantiomorph ‘S’,
+// ‘P’, or ‘seqTrans’.
+//
+
+// Rule 6 (proposed): An undifferentiated reference node has priority over any other
+// undifferentiated node
 
 template <auto... Rules, typename T>
 CMP check_all_rules(const T& s1, const T& s2) {
@@ -387,9 +408,20 @@ CMP check_all_rules(const T& s1, const T& s2) {
     return res;
 }
 
-CMP rank_ligands(mol, src, ligand1, ligand2) {
-    Shells shells1(mol, src, ligand1);
-    Shells shells2(mol, src, ligand2);
+CMP constitutional_rank_ligands(const Atom* src, const Atom* ligand1, const Atom* ligand2) {
+    Shells shells1(src, ligand1);
+    Shells shells2(src, ligand2);
 
     return check_all_rules<rule_1a, rule_1b, rule_2>(shells1, shells2);
+}
+
+// make this templated on the rule set
+// take a max recursion depth parameter
+Descriptor label(std::vector<std::pair<Atom*, Atom*> directors) {
+    std::vector<Shells> ligands;
+    for (auto [src, l]: directors) {
+        ligands.emplace_back(src, l);
+    }
+    // set some flag that says a differentiator was pseudo
+    std::ranges::sort(ligands, check_all_rules<rule_1a, rule_1b, rule_2>);
 }

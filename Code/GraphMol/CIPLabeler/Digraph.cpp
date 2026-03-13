@@ -26,7 +26,7 @@ namespace {
  * Upper limit on the size of the digraph, stops out of memory error with a
  * more graceful failure. 0=Infinite
  */
-const int MAX_NODE_COUNT = 10000000;
+const int MAX_NODE_COUNT = 30000000;
 
 /**
  * Used for debugging only, 0=Infinite
@@ -39,6 +39,14 @@ Node &Digraph::addNode(std::vector<char> &&visit, Atom *atom,
   d_nodes.emplace_back(this, std::move(visit), atom, std::move(frac), dist,
                        flags);
   return d_nodes.back();
+}
+
+bool Digraph::seenAtom(Atom *atom) const
+{
+    for (auto& n: d_nodes) {
+        if (n.getAtom() == atom) {return true;}
+    }
+    return false;
 }
 
 void Digraph::addEdge(Node *beg, Bond *bond, Node *end) {

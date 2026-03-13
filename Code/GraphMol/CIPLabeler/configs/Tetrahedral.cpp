@@ -145,13 +145,32 @@ Descriptor Tetrahedral::label(Node *node, const Rules &comp) {
   auto ordered = std::vector<Atom *>(4, nullptr);
   int idx = 0;
   d_ranked_anchors.reserve(4);
+
+
+
   for (const auto &edge : edges) {
-    if (edge->getEnd()->isSet(Node::BOND_DUPLICATE) ||
-        edge->getEnd()->isSet(Node::IMPL_HYDROGEN)) {
+    auto other = edge->getOther(node);
+    if (
+        // other->isSet(Node::DUPLICATE_OR_H) ||
+        other->isSet(Node::BOND_DUPLICATE) ||
+        other->isSet(Node::IMPL_HYDROGEN
+        )) {
+      if (other->getAtomIdx() == 1339) {
+          if (other->isSet(Node::BOND_DUPLICATE)) {
+              std::cerr << "1339: Bond duplicate\n";
+          }
+          if (other->isSet(Node::IMPL_HYDROGEN)) {
+              std::cerr << "1339: implicit h\n";
+          }
+          if (other->isSet(Node::RING_DUPLICATE)) {
+              std::cerr << "1339: ring dupl\n";
+          }
+      }
+
       continue;
     }
 
-    auto atom = edge->getEnd()->getAtom();
+    auto atom = other->getAtom();
     ordered[idx] = atom;
 
     // In this case we don't worry about implicit H (see Sp2Bond
@@ -172,9 +191,33 @@ Descriptor Tetrahedral::label(Node *node, const Rules &comp) {
     ordered[idx] = focus;
   }
 
+  // {
+  //     auto a = node->getAtom();
+  //     if (a->getIdx() + 1 == 3328) {
+  //         std::cerr << "here\n";
+  //         std::cerr << '[' << ordered[0] << ' ' << ordered[1] << ' ' << ordered[2] << ' ' << ordered[3] << "]\n";
+  //         std::cerr << ordered[0]->getSymbol() << ' ' << ordered[0]->getIdx() + 1 << '\n';
+  //         std::cerr << ordered[1]->getSymbol() << ' ' << ordered[1]->getIdx() + 1 << '\n';
+  //         std::cerr << ordered[2]->getSymbol() << ' ' << ordered[2]->getIdx() + 1 << '\n';
+  //         // std::cerr << ordered[3]->getSymbol() << ' ' << ordered[3]->getIdx() + 1 << '\n';
+  //     }
+  // }
+
+
   int parity = parity4(ordered, getCarriers());
 
   if (parity == 0) {
+    auto a = node->getAtom();
+    std::cerr << "failure on " << a->getSymbol() << ' ' << a->getIdx() + 1 << std::endl;
+    std::cerr << '[' << ordered[0] << ' ' << ordered[1] << ' ' << ordered[2] << ' ' << ordered[3] << "]\n";
+    auto trg = getCarriers();
+    std::cerr << '[' << trg[0] << ' ' << trg[1] << ' ' << trg[2] << ' ' << trg[3] << "]\n";
+    std::cerr << "focus was " << focus << " and idx=" << idx << '\n';
+    std::cerr << trg[0]->getSymbol() << ' ' << trg[0]->getIdx() + 1 << '\n';
+    std::cerr << trg[1]->getSymbol() << ' ' << trg[1]->getIdx() + 1 << '\n';
+    std::cerr << trg[2]->getSymbol() << ' ' << trg[2]->getIdx() + 1 << '\n';
+    std::cerr << trg[3]->getSymbol() << ' ' << trg[3]->getIdx() + 1 << '\n';
+    // ->getIdx()
     throw std::runtime_error("Could not calculate parity! Carrier mismatch");
   }
 

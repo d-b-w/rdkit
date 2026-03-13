@@ -5,10 +5,27 @@
 //  Supports multiple files and glob patterns
 //
 
+//
+// mmshare/test/testfiles/4axm.pdb
+//
+// /Users/dbn/builds/26-2/source/mmshare/test/testfiles/2j3n.pdb
+// /Users/dbn/builds/26-2/source/mmshare/maestrolibs/src/structhierarchy/test/test_data/6m17.pdb
+// /Users/dbn/builds/26-2/source/mmshare/test/testfiles/bioluminate/antibody/1baf.pdb
+// /Users/dbn/builds/26-2/source/mmshare/test/testfiles/1qpe.pdb
+// /Users/dbn/builds/26-2/source/mmshare/test/testfiles/ccd_mismatch.pdb
+// /Users/dbn/builds/26-2/source/mmshare/test/schrodinger/structure/mmpdb/testsuite/1ida.pdb
+// /Users/dbn/builds/26-2/source/mmshare/python/test/common_scripts/primex_polish_tests/2i35.pdb
+// /Users/dbn/builds/26-2/source/mmshare/python/test/common_scripts/primex_polish_tests/test_data/2i35.pdb
+// /Users/dbn/builds/26-2/source/mmshare/python/test/common_scripts/primex_polish_tests/test_data/PRIMEX-1174/3mbv.pdb
+//
+
+
 #include <iostream>
 #include <chrono>
 #include <string>
 #include <exception>
+#include <vector>
+#include <algorithm>
 #include <GraphMol/FileParsers/FileParsers.h>
 #include <GraphMol/SmilesParse/SmilesWrite.h>
 #include <GraphMol/RDKitBase.h>
@@ -18,12 +35,29 @@
 using namespace RDKit;
 using namespace std::chrono;
 
-using NewCIPLabeler::assignCIPLabels;
-using NewCIPLabeler::MaxIterationsExceeded;
-// using CIPLabeler::assignCIPLabels;
-// using CIPLabeler::MaxIterationsExceeded;
+// Track file performance and failures
+struct FileResult {
+  std::string filename;
+  long long time_us;
+  int stereocenters;
+  bool success;
+  std::string error;
+};
 
-bool processPDBFile(const std::string& pdb_file) {
+std::vector<FileResult> g_results;
+
+// using NewCIPLabeler::assignCIPLabels;
+// using NewCIPLabeler::MaxIterationsExceeded;
+using CIPLabeler::assignCIPLabels;
+using CIPLabeler::MaxIterationsExceeded;
+
+static bool processPDBFile(const std::string& pdb_file, FileResult& result) {
+  result.filename = pdb_file;
+  result.success = false;
+  result.time_us = 0;
+  result.stereocenters = 0;
+  result.error = "";
+
   std::cout << "\n" << std::string(80, '=') << "\n";
   std::cout << "Reading PDB file: " << pdb_file << "\n";
 
@@ -34,6 +68,7 @@ bool processPDBFile(const std::string& pdb_file) {
   try {
     mol.reset(PDBFileToMol(pdb_file));
   } catch (const std::exception& e) {
+    result.error = std::string("Parse error: ") + e.what();
     std::cerr << "ERROR: Failed to parse PDB file: " << e.what() << "\n";
     std::cerr << "Skipping this file.\n";
     return false;
@@ -42,6 +77,7 @@ bool processPDBFile(const std::string& pdb_file) {
   auto end_parse = high_resolution_clock::now();
 
   if (!mol) {
+    result.error = "Parse error: returned null";
     std::cerr << "ERROR: Failed to parse PDB file (returned null)\n";
     std::cerr << "Skipping this file.\n";
     return false;
@@ -51,9 +87,9 @@ bool processPDBFile(const std::string& pdb_file) {
   std::cout << "Parsed in " << parse_time.count() << " ms\n";
 
   // Molecule statistics
-  std::cout << "\nMolecule statistics:\n";
-  std::cout << "  Atoms: " << mol->getNumAtoms() << "\n";
-  std::cout << "  Bonds: " << mol->getNumBonds() << "\n";
+  // std::cout << "\nMolecule statistics:\n";
+  // std::cout << "  Atoms: " << mol->getNumAtoms() << "\n";
+  // std::cout << "  Bonds: " << mol->getNumBonds() << "\n";
 
   // Count potential stereocenters
   int tetrahedral_count = 0;
@@ -75,11 +111,14 @@ bool processPDBFile(const std::string& pdb_file) {
     }
   }
 
-  std::cout << "  Tetrahedral centers: " << tetrahedral_count << "\n";
-  std::cout << "  Stereo double bonds: " << double_bond_count << "\n";
+  // std::cout << "  Tetrahedral centers: " << tetrahedral_count << "\n";
+  // std::cout << "  Stereo double bonds: " << double_bond_count << "\n";
+
+  result.stereocenters = tetrahedral_count + double_bond_count;
 
   if (tetrahedral_count == 0 && double_bond_count == 0) {
     std::cout << "\nNo stereocenters found - nothing to label\n";
+    result.success = true;
     return true;  // Still successful, just nothing to do
   }
 
@@ -90,15 +129,28 @@ bool processPDBFile(const std::string& pdb_file) {
   try {
     assignCIPLabels(*mol);
   } catch (const MaxIterationsExceeded& e) {
+    auto end_cip = high_resolution_clock::now();
+    auto cip_time = duration_cast<microseconds>(end_cip - start_cip);
+    result.time_us = cip_time.count();
+    result.error = std::string("MaxIterationsExceeded: ") + e.what();
     std::cerr << "ERROR: " << e.what() << "\n";
+    std::cerr << " after " << cip_time.count() << " µs (" << (cip_time.count() / 1000.0) << " ms)\n";
     return false;
   } catch (const std::exception& e) {
+    auto end_cip = high_resolution_clock::now();
+    auto cip_time = duration_cast<microseconds>(end_cip - start_cip);
+    result.time_us = cip_time.count();
+    result.error = std::string("Exception: ") + e.what();
     std::cerr << "ERROR: " << e.what() << "\n";
+    std::cerr << " after " << cip_time.count() << " µs (" << (cip_time.count() / 1000.0) << " ms)\n";
     return false;
   }
 
   auto end_cip = high_resolution_clock::now();
   auto cip_time = duration_cast<microseconds>(end_cip - start_cip);
+
+  result.time_us = cip_time.count();
+  result.success = true;
 
   std::cout << "CIP labeling completed in " << cip_time.count() << " µs ("
             << (cip_time.count() / 1000.0) << " ms)\n";
@@ -120,12 +172,12 @@ bool processPDBFile(const std::string& pdb_file) {
     }
   }
 
-  std::cout << "\nResults:\n";
-  std::cout << "  Labeled atoms: " << labeled_atoms << " / " << tetrahedral_count << "\n";
-  std::cout << "  Labeled bonds: " << labeled_bonds << " / " << double_bond_count << "\n";
+  // std::cout << "\nResults:\n";
+  // std::cout << "  Labeled atoms: " << labeled_atoms << " / " << tetrahedral_count << "\n";
+  // std::cout << "  Labeled bonds: " << labeled_bonds << " / " << double_bond_count << "\n";
 
   // Show atom labels
-  if (labeled_atoms > 0) {
+  if (labeled_atoms > 0 && false) {
     std::cout << "\nAtom labels";
     if (labeled_atoms > 5) {
       std::cout << " (showing first 5 of " << labeled_atoms << ")";
@@ -147,7 +199,7 @@ bool processPDBFile(const std::string& pdb_file) {
     }
   }
 
-  if (labeled_bonds > 0) {
+  if (labeled_bonds > 0 && false) {
     std::cout << "\nBond labels";
     if (labeled_bonds > 5) {
       std::cout << " (showing first 5 of " << labeled_bonds << ")";
@@ -171,12 +223,19 @@ bool processPDBFile(const std::string& pdb_file) {
   }
 
   // Performance summary
-  std::cout << "\nPerformance:\n";
+  // std::cout << "\nPerformance:\n";
   if (labeled_atoms + labeled_bonds > 0) {
     double us_per_center = cip_time.count() / static_cast<double>(labeled_atoms + labeled_bonds);
     std::cout << "  Average: " << us_per_center << " µs per stereocenter\n";
-    std::cout << "  Total: " << cip_time.count() << " µs\n";
-    std::cout << "  Rate: " << (1000000.0 / us_per_center) << " centers/sec\n";
+    // bold if slow
+    if (cip_time.count() > 100000) {
+        std::cout << "\e[1m";
+    }
+    std::cout << "  Total: " << cip_time.count() << " µs";
+    if (cip_time.count() > 100000) {
+        std::cout << "\e[0m";
+    }
+    // std::cout << "\n  Rate: " << (1000000.0 / us_per_center) << " centers/sec\n";
   }
 
   return true;
@@ -197,17 +256,23 @@ int main(int argc, char** argv) {
   // Wait for user to attach profiler (only for first file)
   std::cout << "\nReady to run CIP labeling.\n";
   std::cout << "Press Enter to continue (attach profiler now if needed)...";
-  std::cin.get();
+  // std::cin.get();
 
   for (int i = 1; i < argc; ++i) {
+    FileResult result;
     try {
-      bool success = processPDBFile(argv[i]);
+      auto success = processPDBFile(argv[i], result);
+      g_results.push_back(result);
       if (success) {
         successful++;
       } else {
         failed++;
       }
     } catch (const std::exception& e) {
+      result.filename = argv[i];
+      result.success = false;
+      result.error = std::string("FATAL: ") + e.what();
+      g_results.push_back(result);
       std::cerr << "\nFATAL ERROR processing " << argv[i] << ": " << e.what() << "\n";
       std::cerr << "Skipping this file.\n";
       failed++;
@@ -220,6 +285,58 @@ int main(int argc, char** argv) {
   std::cout << "  Total files: " << total_files << "\n";
   std::cout << "  Successful: " << successful << "\n";
   std::cout << "  Failed: " << failed << "\n";
+
+  // Show failed files (CIP labeling errors only, not parse errors)
+  std::vector<FileResult> cip_failures;
+  for (const auto& r : g_results) {
+    if (!r.success && r.error.find("Parse error:") != 0) {
+      cip_failures.push_back(r);
+    }
+  }
+
+  if (!cip_failures.empty()) {
+    std::cout << "\n" << std::string(80, '-') << "\n";
+    std::cout << "CIP labeling failures:\n";
+    for (const auto& r : cip_failures) {
+      std::cout << "  " << r.filename << "\n";
+      std::cout << "    Error: " << r.error << "\n";
+      if (r.time_us > 0) {
+        std::cout << "    Time before failure: " << r.time_us << " µs ("
+                  << (r.time_us / 1000.0) << " ms)\n";
+      }
+    }
+  }
+
+  // Show slowest files (top 10)
+  if (successful > 0) {
+    std::vector<FileResult> successful_results;
+    for (const auto& r : g_results) {
+      if (r.success && r.stereocenters > 0) {
+        successful_results.push_back(r);
+      }
+    }
+
+    if (!successful_results.empty()) {
+      std::sort(successful_results.begin(), successful_results.end(),
+                [](const FileResult& a, const FileResult& b) {
+                  return a.time_us > b.time_us;
+                });
+
+      std::cout << "\n" << std::string(80, '-') << "\n";
+      std::cout << "Slowest files (top " << std::min(10, (int)successful_results.size()) << "):\n";
+      int shown = 0;
+      for (const auto& r : successful_results) {
+        if (shown >= 10) break;
+        double ms = r.time_us / 1000.0;
+        double us_per_center = r.time_us / static_cast<double>(r.stereocenters);
+        std::cout << "  " << (shown + 1) << ". " << r.filename << "\n";
+        std::cout << "     " << r.time_us << " µs (" << ms << " ms) for "
+                  << r.stereocenters << " centers (" << us_per_center
+                  << " µs/center)\n";
+        shown++;
+      }
+    }
+  }
 
   return (failed == total_files) ? 1 : 0;
 }

@@ -42,7 +42,7 @@ CenterRanking rankSubstituents(const ROMol& mol,
   }
 
   // Safety limits: prevent infinite loops on pathological molecules
-  constexpr uint32_t HARD_MAX_SHELLS = 10000;
+  constexpr uint32_t HARD_MAX_SHELLS = 100000;
 
   // If max_shells is 0, use reasonable default
   uint32_t max_iter = (max_shells == 0) ? HARD_MAX_SHELLS : std::min(max_shells, HARD_MAX_SHELLS);
