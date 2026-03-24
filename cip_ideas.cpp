@@ -33,7 +33,7 @@ void label(ROMol mol) {
 }
 
 struct Atom {
-int atomic_number;
+int atomicNumber;
 int isotope;
 };
 
@@ -52,37 +52,45 @@ LESS, PSEUDO_LESS, EQUAL, PSEUDO_GREATER, GREATER
 };
 static constexpr auto EMPTY = std::limits<size_t>::max;
 
-enum class BOND_DESCRIPTOR {
+enum class BONDDESCRIPTOR {
     UNASSIGNED, NONE, Z, E
 };
-enum class ATOM_DESCRIPTOR {
+enum class ATOMDESCRIPTOR {
     UNASSIGNED, NONE, r, s, R, S
 };
 
 
 struct CIPAtom {
-    uchar atomic_number; // this may be fractional due to averaging
-    double mass_number; // this may be fractional due to averaging
-    size_t depth;
-    Descriptor descriptor;
-    Descriptor aux_descriptor;
-    // char flags; // ring duplicate, bond duplicate, implicit hydrogen
-    bool ring_duplicate = false;
-    bool bond_duplicate = false;
-    bool implicit_hydrogen = false;
-    bool expanded = false;
+    CIPAtom(const CIPAtom&) = delete;
+    CIPAtom(CIPAtom&&) = default;
+    auto operator=(const CIPAtom&) = delete;
+    auto operator=(CIPAtom&&) = default;
 
-    Atom* real_atom = nullptr;
-    CIPAtom* source_atom = nullptr;
+    uchar atomicNumber; // this may be fractional due to averaging
+    double massNumber; // this may be fractional due to averaging
+    size_t depth;
+    BONDDESCRIPTOR bondDescriptor = BONDDESCRIPTOR::UNASSIGNED;
+    ATOMDESCRIPTOR atomDescriptor = ATOMDESCRIPTOR::UNASSIGNED;
+    // Descriptor descriptor = UNASSIGNED;
+    // Descriptor auxDescriptor = UNASSIGNED;
+
+    Atom* realAtom = nullptr;
+    CIPAtom* sourceAtom = nullptr;
     CIPAtom* parent = nullptr;
     size_t idx = EMPTY;
-    uchar shell_rank = 0;
-    uchar cross_rank = 0;
+    // char flags; // ring duplicate, bond duplicate, implicit hydrogen
+    bool ringDuplicate = false;
+    bool bondDuplicate = false;
+    bool implicitHydrogen = false;
+    bool expanded = false;
+
+    // uchar shell_rank = 0;
+    // uchar cross_rank = 0;
 
     std::span<CIPAtom> children;
-    Shells& mol;
 
-    // link to the real atom
+    CIPAtom(CIPAtom* parent, CIPAtom& reference);
+    CIPAtom(CIPAtom* parent, Atom* reference, bool bondDuplicate);
 
     bool isVisited(size_t i) const {
         // if it's not in a ring, this isn't possible
@@ -93,53 +101,87 @@ struct CIPAtom {
         return a.idx == i;
     }
 
-    unsigned int ringClosureDepth(size_t i) const {
+    unsigned int ringClosureDepth() const {
         // if it's not in a ring, this isn't possible
+        if (realAtom) {
+            auto ri = realAtom->getOwningMol()->getRingInfo();
+            if (ri && ri->numAtomRings(idx) == 0) {
+                return depth;
+            }
+        }
+
         auto a = this;
-        while (a.idx != i && a.parent) {
-            a = a.parent;
+        const auto i = a->idx;
+        while (a->idx != i && a->parent) {
+            a = a->parent;
         }
-        if (a.idx == i) {
-            return a.depth;
-        }
-        // not a ring closure
-        return std::limits<unsigned int>::max;
+        return a->depth;
     }
 
     size_t neighborCount() const {
-        if (source_atom) {
+        if (sourceAtom) {
             // based on an existing CIP DAG. use that count (+ the parent)
-            return source_atom->children.size() + 1;
+            return sourceAtom->children.size() + 1;
         } else {
             size_t count = 0u;
-            count += real_atom->getTotalNumHs();
-            for (auto b: real_atom->getOwningMol()->atomBonds()) {
+            count += realAtom->getTotalNumHs();
+            for (auto b: realAtom->getOwningMol()->atomBonds()) {
                 count += static_cast<size_t>(b->getBondTypeAsDouble());
             }
             return count;
         }
     }
     void expand(std::vector<CIPAtom>& atoms) {
-        if (source_atom) {
-            for (auto c: source_atom->children) {
+        if (expanded) {
+            return;
+        }
+        const auto initial_size = atoms.size();
+        if (sourceAtom) {
+            for (auto c: sourceAtom->children) {
                 // duplicate it
                 atoms.emplace_back({*this, c});
             }
         } else {
-            for (auto b: real_atom->getOwningMol()->atomBonds()) {
-                auto other = b->getOtherAtom(real_atom);
+            for (auto b: realAtom->getOwningMol()->atomBonds()) {
+                auto other = b->getOtherAtom(realAtom);
                 auto reps = static_cast<size_t>(b->getBondTypeAsDouble());
                 for (size_t i = 0; i < reps; ++i) {
                     atoms.emplace_back({*this, other, i != 0});
                 }
             }
-            for (size_t i = 0; i < real_atom->getTotalNumHs(); ++i) {
+            for (size_t i = 0; i < realAtom->getTotalNumHs(); ++i) {
                 atoms.emplace_back({*this, nullptr, i != 0});
             }
         }
+        children = {atoms.begin() + initial_size, atoms.end()};
+        expanded = true;
     }
 };
 
+CIPAtom::CIPAtom(CIPAtom* parent, CIPAtom& reference):
+atomicNumber(reference.atomicNumber), massNumber(reference.massNumber), depth(parent->depth + 1),
+realAtom(reference.realAtom), parent(parent), idx(reference.idx), ringDuplicate(reference.ringDuplicate),
+bondDuplicate(reference.bondDuplicate), implicitHydrogen(reference.implicitHydrogen)
+{
+
+}
+CIPAtom::CIPAtom(CIPAtom* parent, Atom* reference, bool bondDuplicate):
+    depth(parent->depth + 1), realAtom(reference), parent(parent), bondDuplicate(bondDuplicate)
+{
+    if (reference) {
+        atomicNumber = reference->getAtomicNum();
+        massNumber = reference->getMass();
+        if (bondDuplicate) {
+            depth = parent->depth;
+        } else {
+            depth = ringClosureDepth();
+        }
+    } else {
+        implicitHydrogen = true;
+        atomicNumber = 1;
+        massNumber = 1; // right?
+    }
+}
 
 struct Shells;
 
@@ -255,10 +297,10 @@ bool Shells::reserveForNextShell()
 {
     // populate the next shell and fix spans
     size_t new_atom_count = 0;
-    size_t new_neighbor_group_count = 0;
+    size_t newNeighbor_group_count = 0;
     for (auto& a : shells.back() | std::views::join) {
         const auto neighbors = a.neighborCount() - 1; // ignore parent
-        new_neighbor_group_count += 1 ? neighbors != 0 : 1;
+        newNeighbor_group_count += 1 ? neighbors != 0 : 1;
         new_atom_count += neighbors;
     }
     if (new_atom_count == 0) {
@@ -274,7 +316,7 @@ bool Shells::reserveForNextShell()
     }
 
     const auto neighbor_groups_ptr = std::static_cast<void*>(neighbor_groups.data());
-    neighbor_groups.reserve(neighbor_groups.size() + new_neighbor_group_count);
+    neighbor_groups.reserve(neighbor_groups.size() + newNeighbor_group_count);
     // reallocation, need to update span pointers
     if (new_atoms_offset != 0) {
         for (auto& g: neighbor_groups) {
@@ -282,7 +324,7 @@ bool Shells::reserveForNextShell()
         }
     }
     const auto neighbor_groups_offset = std::static_cast<void*>(neighbor_groups.data());
-    shells.reserve(shells.size() + new_neighbor_group_count);
+    shells.reserve(shells.size() + newNeighbor_group_count);
     // reallocation, need to update span pointers
     if (neighbor_groups_offset != 0) {
         for (auto& s: shells) {
@@ -305,30 +347,8 @@ bool Shells::makeNextShell()
     const auto shell_start = neighbor_groups.size();
 
     for (auto& a : shells.back() | std::views::join) {
-        const auto next_group_start = atoms.size();
-
-        // but what neighbors are these?
-        // likely the bonds of the RDK native atom
-        // Make sure to double double-bonds here. And the
-        // whole mancude averaging thing
-        for (auto n: a.neighbors) {
-            if (n == a.parent) {continue;}
-
-            // check for loop closure and other fake nodes
-            // get ring closure depth here!
-            const bool is_ring_closure = ever_visited[n.atom->getIdx()] && n.isVisited();
-
-            //add an atom
-            atoms.emplace_back {
-                n
-                .depth=depth
-            };
-            // double if double bond
-        }
-        // add implicit H nodes
-        std::span children = {atoms.begin() + next_group_start, atoms.end()};
-        neighbor_groups.emplace_back(children);
-        a.children = children;
+        a.expand(atoms);
+        neighbor_groups.push_back(a.children);
     }
     shells.emplace_back(neighbor_groups.begin() + shell_start, neighbor_groups.end());
     return true;
@@ -384,9 +404,19 @@ CMP rank_ligands(shells1, shells2)
 }
 
 
+CMP doCMP(auto this, auto that) {
+    if (this < that) {
+        return CMP::LESS;
+    } else if (this == that) {
+        return CMP::EQUAL;
+    } else {
+        return CMP::GREATER;
+    }
+}
+
 // Rule 1a: Higher atomic number precedes lower.
-bool rule_1a(CIPAtom a1, CIPAtom a2) {
-    return a1.atomic_number < a2.atomic_number;
+CMP rule_1a(const CIPAtom& a1, const CIPAtom& a2) {
+    return doCMP(a1.atomicNumber, a2.atomicNumber);
 }
 
 // Rule 1b (proposed): Lower root distance precedes higher root distance, where “root
@@ -394,26 +424,26 @@ bool rule_1a(CIPAtom a1, CIPAtom a2) {
 // the duplicated atom; (b) in the case of multiple-bond duplicate nodes as the sphere of
 // the atom to which the duplicate node is attached; and (c) in all other cases as the
 // sphere of the atom itself.
-bool rule_1b(CIPAtom a1, CIPAtom a2) {
-    return a1.depth < a2.depth;
+bool rule_1b(const CIPAtom& a1, const CIPAtom& a2) {
+    return doCMP(a1.depth, a2.depth);
 }
 
-bool rule_2(CIPAtom a1, CIPAtom a2) {
-    return a1.mass_number < a2.mass_number;
+bool rule_2(const CIPAtom& a1, const CIPAtom& a2) {
+    return doCMP(a1.massNumber, a2.massNumber);
 }
 
 // Rule 3: When considering double bonds and planar tetraligand atoms, ‘seqcis’ = ‘Z’ precedes
 // ‘seqtrans’ = ‘E’, and this precedes nonstereogenic double bonds.
-bool rule_3(CIPAtom a1, CIPAtom a2) {
+bool rule_3(const CIPAtom& a1, const CIPAtom& a2) {
     // require that bond descriptors are set
-    return a1.bond_descriptor < a2.bond_descriptor;
+    return doCMP(a1.bondDescriptor, a2.bondDescriptor);
 }
 
 // Rule 4a: Chiral stereogenic units precede pseudoasymmetric stereogenic units, and these precede
 // nonstereogenic units.
-bool rule_4a(CIPAtom a1, CIPAtom a2) {
+bool rule_4a(const CIPAtom& a1, const CIPAtom& a2) {
     // require that atom descriptors are set
-    return a1.atom_descriptor / 2  < a2.atom_descriptor / 2;
+    return doCMP(a1.atomDescriptor / 2, a2.atomDescriptor / 2);
 }
 
 
@@ -435,7 +465,7 @@ bool rule_4a(CIPAtom a1, CIPAtom a2) {
 // fully sorted (or pseudo-sorted)
 // simple bubble sort - we expect the ranges to be small (<4)
 template <T cmp>
-CMP cip_sort(auto& range) {
+CMP shallow_cip_sort(auto& range) {
     using enum CMP;
     bool pseudo = false;
     bool unsortable = false;
