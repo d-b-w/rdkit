@@ -1,9 +1,8 @@
-
-#include <QtCore/qnamespace.h>
-#include <algorithm>
-#include <ranges>
-#include <iterator>
-
+/*
+ *
+ *
+ *
+ */
 
 // not sure if this is needed
 struct CIPMol {
@@ -71,8 +70,11 @@ struct CIPAtom {
     bool ring_duplicate = false;
     bool bond_duplicate = false;
     bool implicit_hydrogen = false;
+    bool expanded = false;
 
-    size_t parent = EMPTY;
+    Atom* real_atom = nullptr;
+    CIPAtom* source_atom = nullptr;
+    CIPAtom* parent = nullptr;
     size_t idx = EMPTY;
     uchar shell_rank = 0;
     uchar cross_rank = 0;
@@ -80,15 +82,13 @@ struct CIPAtom {
     std::span<CIPAtom> children;
     Shells& mol;
 
-
-
     // link to the real atom
 
     bool isVisited(size_t i) const {
         // if it's not in a ring, this isn't possible
         auto a = this;
-        while (a.idx != i && a.parent != EMPTY) {
-            a = &(a.mol.atoms[a.parent]);
+        while (a.idx != i && a.parent) {
+            a = a.parent;
         }
         return a.idx == i;
     }
@@ -96,8 +96,8 @@ struct CIPAtom {
     unsigned int ringClosureDepth(size_t i) const {
         // if it's not in a ring, this isn't possible
         auto a = this;
-        while (a.idx != i && a.parent != EMPTY) {
-            a = &(a.mol.atoms[a.parent]);
+        while (a.idx != i && a.parent) {
+            a = a.parent;
         }
         if (a.idx == i) {
             return a.depth;
@@ -106,6 +106,38 @@ struct CIPAtom {
         return std::limits<unsigned int>::max;
     }
 
+    size_t neighborCount() const {
+        if (source_atom) {
+            // based on an existing CIP DAG. use that count (+ the parent)
+            return source_atom->children.size() + 1;
+        } else {
+            size_t count = 0u;
+            count += real_atom->getTotalNumHs();
+            for (auto b: real_atom->getOwningMol()->atomBonds()) {
+                count += static_cast<size_t>(b->getBondTypeAsDouble());
+            }
+            return count;
+        }
+    }
+    void expand(std::vector<CIPAtom>& atoms) {
+        if (source_atom) {
+            for (auto c: source_atom->children) {
+                // duplicate it
+                atoms.emplace_back({*this, c});
+            }
+        } else {
+            for (auto b: real_atom->getOwningMol()->atomBonds()) {
+                auto other = b->getOtherAtom(real_atom);
+                auto reps = static_cast<size_t>(b->getBondTypeAsDouble());
+                for (size_t i = 0; i < reps; ++i) {
+                    atoms.emplace_back({*this, other, i != 0});
+                }
+            }
+            for (size_t i = 0; i < real_atom->getTotalNumHs(); ++i) {
+                atoms.emplace_back({*this, nullptr, i != 0});
+            }
+        }
+    }
 };
 
 
@@ -219,18 +251,15 @@ std::span<std::span<CIPAtom>>* Shells::getShell(size_t idx)
     return &shells[idx];
 }
 
-
 bool Shells::reserveForNextShell()
 {
     // populate the next shell and fix spans
     size_t new_atom_count = 0;
     size_t new_neighbor_group_count = 0;
     for (auto& a : shells.back() | std::views::join) {
-        neighbors = a.neighbors.size() - 1; // ignore parent
+        const auto neighbors = a.neighborCount() - 1; // ignore parent
         new_neighbor_group_count += 1 ? neighbors != 0 : 1;
         new_atom_count += neighbors;
-        // add duplicate nodes
-        // add implicit hydrogens
     }
     if (new_atom_count == 0) {
         return false;
@@ -238,6 +267,11 @@ bool Shells::reserveForNextShell()
     const auto atoms_ptr = std::static_cast<void*>(atoms.data());
     atoms.reserve(atoms.size() + new_atom_count);
     const auto new_atoms_offset = std::static_cast<void*>(atoms.data()) - atoms_ptr;
+    if (new_atoms_offset) {
+        for (auto& a: atoms) {
+            a.parent += new_atoms_offset;
+        }
+    }
 
     const auto neighbor_groups_ptr = std::static_cast<void*>(neighbor_groups.data());
     neighbor_groups.reserve(neighbor_groups.size() + new_neighbor_group_count);
@@ -292,11 +326,10 @@ bool Shells::makeNextShell()
             // double if double bond
         }
         // add implicit H nodes
-        neighbor_groups_idx.emplace_back(next_group_start, atoms.size());
-        neighbor_groups.emplace_back(atoms.begin() + next_group_start, atoms.end());
-        a.children = neighbor_groups.back();
+        std::span children = {atoms.begin() + next_group_start, atoms.end()};
+        neighbor_groups.emplace_back(children);
+        a.children = children;
     }
-    shells_idx.emplace_back(shell_start, neighbor_groups.size() - shell_start);
     shells.emplace_back(neighbor_groups.begin() + shell_start, neighbor_groups.end());
     return true;
 }
@@ -396,6 +429,48 @@ bool rule_4a(CIPAtom a1, CIPAtom a2) {
 
 // Rule 6 (proposed): An undifferentiated reference node has priority over any other
 // undifferentiated node
+
+
+// sort a range given a comparator. record whether it is
+// fully sorted (or pseudo-sorted)
+// simple bubble sort - we expect the ranges to be small (<4)
+template <T cmp>
+CMP cip_sort(auto& range) {
+    using enum CMP;
+    bool pseudo = false;
+    bool unsortable = false;
+    for (size_t i =0; i < range.size(); ++i) {
+        for (size_t j= i + 1; j < range.size(); ++j) {
+            auto res = cmp(range[i], range[j]);
+            if (res > EQUAL) {
+                std::swap(range[i], range[j]);
+                // update child pointers here?
+                for (auto& c: range[i].children) {
+                    c.parent = &range[i];
+                }
+                for (auto& c: range[i].children) {
+                    c.parent = &range[j];
+                }
+                updated = true;
+            }
+            if (res == EQUAL) {
+                unsortable = true;
+            }
+            if (res == PSEUDO_LESS || res == PSEUDO_GREATER) {
+                pseudo = true;
+            }
+        }
+    }
+
+    if (unsortable) {
+        return EQUAL;
+    } else if (pseudo) {
+        return PSEUDO_LESS;
+    } else {
+        return LESS;
+    }
+}
+
 
 template <auto... Rules, typename T>
 CMP check_all_rules(const T& s1, const T& s2) {

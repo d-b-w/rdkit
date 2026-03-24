@@ -1,7 +1,8 @@
 //
-//  Test NewCIPLabeler with PDB files
+//  Test NewCIPLabeler with structure files (PDB, SDF, MOL)
 //
-//  Usage: test_pdb <file1.pdb> [file2.pdb ...]
+//  Usage: test_pdb <file1> [file2 ...]
+//  Supports PDB (.pdb) and SD/MOL files (.sdf, .mol, etc.)
 //  Supports multiple files and glob patterns
 //
 
@@ -26,6 +27,7 @@
 #include <exception>
 #include <vector>
 #include <algorithm>
+#include <cctype>
 #include <GraphMol/FileParsers/FileParsers.h>
 #include <GraphMol/SmilesParse/SmilesWrite.h>
 #include <GraphMol/RDKitBase.h>
@@ -51,25 +53,38 @@ std::vector<FileResult> g_results;
 using CIPLabeler::assignCIPLabels;
 using CIPLabeler::MaxIterationsExceeded;
 
-static bool processPDBFile(const std::string& pdb_file, FileResult& result) {
-  result.filename = pdb_file;
+static bool processStructureFile(const std::string& file_path, FileResult& result) {
+  result.filename = file_path;
   result.success = false;
   result.time_us = 0;
   result.stereocenters = 0;
   result.error = "";
 
-  std::cout << "\n" << std::string(80, '=') << "\n";
-  std::cout << "Reading PDB file: " << pdb_file << "\n";
+  // Determine file type from extension
+  bool is_pdb = false;
+  size_t dot_pos = file_path.find_last_of('.');
+  if (dot_pos != std::string::npos) {
+    std::string ext = file_path.substr(dot_pos);
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    is_pdb = (ext == ".pdb");
+  }
 
-  // Read PDB file
+  std::cout << "\n" << std::string(80, '=') << "\n";
+  std::cout << "Reading " << (is_pdb ? "PDB" : "SD/MOL") << " file: " << file_path << "\n";
+
+  // Read file
   auto start_parse = high_resolution_clock::now();
   std::unique_ptr<RWMol> mol;
 
   try {
-    mol.reset(PDBFileToMol(pdb_file));
+    if (is_pdb) {
+      mol.reset(PDBFileToMol(file_path));
+    } else {
+      mol.reset(MolFileToMol(file_path));
+    }
   } catch (const std::exception& e) {
     result.error = std::string("Parse error: ") + e.what();
-    std::cerr << "ERROR: Failed to parse PDB file: " << e.what() << "\n";
+    std::cerr << "ERROR: Failed to parse file: " << e.what() << "\n";
     std::cerr << "Skipping this file.\n";
     return false;
   }
@@ -78,7 +93,7 @@ static bool processPDBFile(const std::string& pdb_file, FileResult& result) {
 
   if (!mol) {
     result.error = "Parse error: returned null";
-    std::cerr << "ERROR: Failed to parse PDB file (returned null)\n";
+    std::cerr << "ERROR: Failed to parse file (returned null)\n";
     std::cerr << "Skipping this file.\n";
     return false;
   }
@@ -243,8 +258,9 @@ static bool processPDBFile(const std::string& pdb_file, FileResult& result) {
 
 int main(int argc, char** argv) {
   if (argc < 2) {
-    std::cerr << "Usage: " << argv[0] << " <file1.pdb> [file2.pdb ...]\n";
-    std::cerr << "Process one or more PDB files (use glob patterns)\n";
+    std::cerr << "Usage: " << argv[0] << " <file1> [file2 ...]\n";
+    std::cerr << "Process structure files: PDB (.pdb) or SD/MOL (.sdf, .mol)\n";
+    std::cerr << "Supports multiple files and glob patterns\n";
     return 1;
   }
 
@@ -252,16 +268,16 @@ int main(int argc, char** argv) {
   int successful = 0;
   int failed = 0;
 
-  std::cout << "Processing " << total_files << " PDB file(s)...\n";
+  std::cout << "Processing " << total_files << " file(s)...\n";
   // Wait for user to attach profiler (only for first file)
   std::cout << "\nReady to run CIP labeling.\n";
   std::cout << "Press Enter to continue (attach profiler now if needed)...";
-  // std::cin.get();
+  std::cin.get();
 
   for (int i = 1; i < argc; ++i) {
     FileResult result;
     try {
-      auto success = processPDBFile(argv[i], result);
+      auto success = processStructureFile(argv[i], result);
       g_results.push_back(result);
       if (success) {
         successful++;
