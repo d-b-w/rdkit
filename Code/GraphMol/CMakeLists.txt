@@ -90,6 +90,7 @@ add_subdirectory(EnumerateStereoisomers)
 
 add_subdirectory(CIPLabeler)
 add_subdirectory(NewCIPLabeler)
+add_subdirectory(NewCIPLabeler2)
 add_subdirectory(Deprotect)
 
 if (RDK_BUILD_STRUCTCHECKER_SUPPORT)
