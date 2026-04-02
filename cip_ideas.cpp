@@ -1,7 +1,11 @@
 /*
- *
- *
- *
+ * vector<CIPAtom> atoms
+ * children should be a span
+ * comparing across the groups of children in out-most depth
+ *  decides order.
+ * only compare ties from earlier generations
+ * need to be able to track parity stacks
+ * tie resolution re-sorts children
  */
 
 // not sure if this is needed
@@ -14,7 +18,6 @@ struct CIPMol {
         // populate atoms?
         // reorder atoms by connectivity?
     }
-
 };
 
 
@@ -26,9 +29,14 @@ void label(ROMol mol) {
 
     }
     //
-    // do the consti
+    // do the constitutional rankings
+    // do the remaining stereo bonds
+    // - add auxiliary descriptors, out to in
+    // - label atoms
+    // do the remaining stereo atoms
+    // - add auxiliary descriptors, out to in
+    // - label atoms
     //
-    // sort
 
 }
 
@@ -58,6 +66,23 @@ enum class BONDDESCRIPTOR {
 enum class ATOMDESCRIPTOR {
     UNASSIGNED, NONE, r, s, R, S
 };
+
+bool is_pseudo(ATOMDESCRIPTOR descriptor) {
+    using enum ATOMDESCRIPTOR;
+    return descriptor == r || descriptor == s;
+}
+// bool is_pseudo(BONDDESCRIPTOR descriptor) {
+//     using enum BONDDESCRIPTOR;
+//     return descriptor == m || descriptor == p;
+// }
+bool is_real(ATOMDESCRIPTOR descriptor) {
+    using enum ATOMDESCRIPTOR;
+    return descriptor == R || descriptor == S;
+}
+bool is_real(BONDDESCRIPTOR descriptor) {
+    using enum BONDDESCRIPTOR;
+    return descriptor == Z || descriptor == E;
+}
 
 
 struct CIPAtom {
@@ -144,6 +169,7 @@ struct CIPAtom {
         } else {
             for (auto b: realAtom->getOwningMol()->atomBonds()) {
                 auto other = b->getOtherAtom(realAtom);
+                // add bond stereo info
                 auto reps = static_cast<size_t>(b->getBondTypeAsDouble());
                 for (size_t i = 0; i < reps; ++i) {
                     atoms.emplace_back({*this, other, i != 0});
@@ -159,15 +185,20 @@ struct CIPAtom {
 };
 
 CIPAtom::CIPAtom(CIPAtom* parent, CIPAtom& reference):
-atomicNumber(reference.atomicNumber), massNumber(reference.massNumber), depth(parent->depth + 1),
-realAtom(reference.realAtom), parent(parent), idx(reference.idx), ringDuplicate(reference.ringDuplicate),
-bondDuplicate(reference.bondDuplicate), implicitHydrogen(reference.implicitHydrogen)
+    atomicNumber(reference.atomicNumber), massNumber(reference.massNumber), depth(parent->depth + 1),
+    realAtom(reference.realAtom), parent(parent), idx(reference.idx), ringDuplicate(reference.ringDuplicate),
+    bondDuplicate(reference.bondDuplicate), implicitHydrogen(reference.implicitHydrogen)
 {
-
+    // Make a CIPAtom reference to another CIPAtom in an existing, fully expanded graph.
+    // This happens the second (and Nth) expansion.
+    //
+    // Probably want a limit here so that it doesn't recurse indefinitely.
 }
 CIPAtom::CIPAtom(CIPAtom* parent, Atom* reference, bool bondDuplicate):
     depth(parent->depth + 1), realAtom(reference), parent(parent), bondDuplicate(bondDuplicate)
 {
+    // Make a CIPAtom based on a regular RDKit atom (or implicit H).
+    // This happens the first epansion of at shell tree.
     if (reference) {
         atomicNumber = reference->getAtomicNum();
         massNumber = reference->getMass();
@@ -255,6 +286,7 @@ private:
     std::vector<CIPAtom> atoms; // all atoms
     std::vector<std::span<CIPAtom>> neighbor_groups; // groups of neighbors of some atom
     std::vector<std::span<std::span<CIPAtom>>> shells; // iterable of neighbor groups
+    std::vector<std::array<CIPAtom*, 2>> ties;
 };
 
 Shells::Shells(const Atom* src, const Atom* ligand)
@@ -313,6 +345,11 @@ bool Shells::reserveForNextShell()
         for (auto& a: atoms) {
             a.parent += new_atoms_offset;
         }
+    }
+
+    for (auto& [l, r]: ties) {
+        l += new_atoms_offset;
+        r += new_atoms_offset;
     }
 
     const auto neighbor_groups_ptr = std::static_cast<void*>(neighbor_groups.data());
@@ -424,25 +461,26 @@ CMP rule_1a(const CIPAtom& a1, const CIPAtom& a2) {
 // the duplicated atom; (b) in the case of multiple-bond duplicate nodes as the sphere of
 // the atom to which the duplicate node is attached; and (c) in all other cases as the
 // sphere of the atom itself.
-bool rule_1b(const CIPAtom& a1, const CIPAtom& a2) {
+CMP rule_1b(const CIPAtom& a1, const CIPAtom& a2) {
     return doCMP(a1.depth, a2.depth);
 }
 
-bool rule_2(const CIPAtom& a1, const CIPAtom& a2) {
+CMP rule_2(const CIPAtom& a1, const CIPAtom& a2) {
     return doCMP(a1.massNumber, a2.massNumber);
 }
 
 // Rule 3: When considering double bonds and planar tetraligand atoms, ‘seqcis’ = ‘Z’ precedes
 // ‘seqtrans’ = ‘E’, and this precedes nonstereogenic double bonds.
-bool rule_3(const CIPAtom& a1, const CIPAtom& a2) {
+CMP rule_3(const CIPAtom& a1, const CIPAtom& a2) {
     // require that bond descriptors are set
     return doCMP(a1.bondDescriptor, a2.bondDescriptor);
 }
 
 // Rule 4a: Chiral stereogenic units precede pseudoasymmetric stereogenic units, and these precede
 // nonstereogenic units.
-bool rule_4a(const CIPAtom& a1, const CIPAtom& a2) {
+CMP rule_4a(const CIPAtom& a1, const CIPAtom& a2) {
     // require that atom descriptors are set
+    // should this also do bond descriptors? I think so
     return doCMP(a1.atomDescriptor / 2, a2.atomDescriptor / 2);
 }
 
@@ -452,38 +490,53 @@ bool rule_4a(const CIPAtom& a1, const CIPAtom& a2) {
 // this is the crazy one
 
 // Rule 4c: ‘r’ precedes ‘s’ and ‘m’ precedes ‘p’.
+CMP rule_4c(const CIPAtom& a1, const CIPAtom& a2) {
+    if (is_pseudo(a1.atomDescriptor) && is_pseudo(a2.atomDescriptor)) {
+        return doCMP(a1.atomDescriptor, a2.atomDescriptor);
+    }
+    // if (is_pseudo(a1.bondDescriptor) && is_pseudo(a2.bondDescriptor)) {
+    //     return doCMP(a1.bondDescriptor, a2.bondDescriptor);
+    // }
+    return CMP::EQUAL;
+}
 
 // Rule 5: An atom or group with descriptor ‘R’, ‘M’, or ‘seqCis’ has priority over its enantiomorph ‘S’,
 // ‘P’, or ‘seqTrans’.
-//
+CMP rule_5(const CIPAtom& a1, const CIPAtom& a2) {
+    if (is_real(a1.atomDescriptor) && is_real(a2.atomDescriptor)) {
+        return doCMP(a1.atomDescriptor, a2.atomDescriptor);
+    }
+    if (is_real(a1.bondDescriptor) && is_real(a2.bondDescriptor)) {
+        return doCMP(a1.bondDescriptor, a2.bondDescriptor);
+    }
+    return CMP::EQUAL;
+}
 
 // Rule 6 (proposed): An undifferentiated reference node has priority over any other
 // undifferentiated node
+CMP rule_6(const CIPAtom& a1, const CIPAtom& a2) {
+    // is this, like, has a copy somewhere?
+    return CMP::EQUAL;
+}
 
 
 // sort a range given a comparator. record whether it is
 // fully sorted (or pseudo-sorted)
 // simple bubble sort - we expect the ranges to be small (<4)
 template <T cmp>
-CMP shallow_cip_sort(auto& range) {
+CMP shallow_cip_sort(auto& range, auto& ties) {
     using enum CMP;
     bool pseudo = false;
     bool unsortable = false;
+    vector<array<int, 2> tt;
     for (size_t i =0; i < range.size(); ++i) {
         for (size_t j= i + 1; j < range.size(); ++j) {
             auto res = cmp(range[i], range[j]);
             if (res > EQUAL) {
-                std::swap(range[i], range[j]);
-                // update child pointers here?
-                for (auto& c: range[i].children) {
-                    c.parent = &range[i];
-                }
-                for (auto& c: range[i].children) {
-                    c.parent = &range[j];
-                }
-                updated = true;
+                swap_em(range[i], range[j]);
             }
             if (res == EQUAL) {
+                tt.emplace_back(range[i].idx, range[j].idx);
                 unsortable = true;
             }
             if (res == PSEUDO_LESS || res == PSEUDO_GREATER) {
@@ -493,12 +546,132 @@ CMP shallow_cip_sort(auto& range) {
     }
 
     if (unsortable) {
+        for (auto [l, r]: tt) {
+            auto a = std::ranges::find(range, l);
+            auto b = std::ranges::find(range, r);
+            ties.emplace_back(a, b);
+        }
         return EQUAL;
     } else if (pseudo) {
         return PSEUDO_LESS;
     } else {
         return LESS;
     }
+}
+
+auto children(CIPAtom* source)
+{
+    std::vector q{source->children};
+    while (!q.empty()) {
+        auto r = q.pop_front();
+        co_yield r;
+        for (const auto& a: r) {
+            q.push_back(r.children);
+        }
+    }
+}
+
+auto child_groups_at_depth(CIPAtom* source, size_t depth)
+{
+    std::vector q{source};
+    while (!q.empty()) {
+        auto r = q.pop_front();
+        if (!r->expanded) {
+            continue;
+        }
+        if (r && r->depth + 1 == depth) {
+            co_yield r->children;
+        }
+        else {
+            for (const auto& c: r->children) {
+                q.push_back(&c);
+            }
+        }
+    }
+}
+
+auto zip_longest(auto& a, auto& b) {
+    const auto short_l = std::min(a.size(), b.size());
+    for (size_t i=0; i < short_l; ++i) {
+        co_yield {&a[i], &b[i]};
+    }
+    if (a.size() > b.size()) {
+        for (auto i=short_l, i < a.size(); ++i) {
+            co_yield {&a[i], nullptr};
+        }
+    } else if (a.size() < b.size()) {
+        for (auto i=short_l, i < b.size(); ++i) {
+            co_yield {nullptr, &b[i]};
+        }
+    }
+}
+
+void swap_em(CIPAtom& a, CIPAtom& b) {
+    std::swap(a, b);
+    // update child pointers
+    for (auto& c: a.children) {
+        c.parent = &a;
+    }
+    for (auto& c: b.children) {
+        c.parent = &b;
+    }
+}
+
+
+// resolve ties within a group
+// changes order within that group
+template <T cmp>
+CMP resolve_tie(std::array<CIPAtom*, 2>& tie, size_t depth)
+{
+    for (const auto& [group1, group2] : zip_longest(child_groups_at_depth(tie[0], depth), child_groups_at_depth(tie[1], depth))) {
+        if (!group1 && !group2) {
+            continue;
+        }
+        if ((!group1 ||
+            group1.empty()) && (group2 && !group2->empty())) {
+            return CMP::LESS;
+        if (!group1.empty() && group2.empty()) {
+            return CMP::GREATER;
+        }
+        auto res = cmp(a1, a2);
+        if (res != CMP::EQUAL) {
+            if (res < CMP::EQUAL) {
+                swap_em(*tie[0], *tie[0]);
+            }
+            return res;
+        }
+    }
+    return CMP::EQUAL;
+}
+
+template <T cmp>
+CMP deep_cip_sort(auto& shells) {
+    // try to sort
+    // if a sort fails, expand to the next shell
+    // once the next shell is sorted, break ties up the ladder?
+
+    for (auto& shell: shells) {
+        if (shell1.empty() && !shell2.empty()) {
+            return CMP::LESS;
+        if (!shell1.empty() && shell2.empty()) {
+            return CMP::GREATER;
+        }
+        for (auto& group: shell) {
+            // make the ties here
+            shallow_cip_sort<cmp>(group, shells.ties);
+        }
+        CMP resolution;
+        for (auto& tie: std::ranges::reverse(shells.ties)) {
+            resolution = resolve_tie(tie);
+            if (resolution != CMP::EQUAL) {
+                shells.ties.remove(tie);
+            }
+        }
+        if (resolution != CMP::EQUAL) {
+            return resolution;
+        }
+    }
+    return CMP::EQUAL;
 }
 
 
