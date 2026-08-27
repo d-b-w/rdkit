@@ -160,7 +160,7 @@ if(RDK_BUILD_CHEMDRAW_SUPPORT)
     writer.cpp
 
     # ${EXPAT_SRC}
-    SHARED LINK_LIBRARIES ChemDraw expatpp
+    SHARED LINK_LIBRARIES ChemDraw
     CIPLabeler ChemTransforms GraphMol RDGeneral Depictor SubstructMatch SmilesParse)
 
   rdkit_library(RDChemDrawReactionLib
