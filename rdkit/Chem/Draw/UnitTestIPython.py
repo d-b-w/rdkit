@@ -50,6 +50,12 @@ class TestCase(unittest.TestCase):
     self.assertTrue(isinstance(res, SVG))
 
   @unittest.skipIf(IPythonConsole is None, 'IPython not available')
+  def testPNGRepresentationWhenUsingSVG(self):
+    IPythonConsole.ipython_useSVG = True
+    self.assertIsNone(self.mol._repr_png_())
+    self.assertTrue(self.mol._repr_svg_())
+
+  @unittest.skipIf(IPythonConsole is None, 'IPython not available')
   def testGithub3101(self):
     m = Chem.MolFromSmiles('CCCC')
 
