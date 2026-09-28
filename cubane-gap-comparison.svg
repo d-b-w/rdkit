@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1020" height="480" viewBox="0 0 1020 480"><rect width="1020" height="480" fill="white" /><text x="20" y="30" style="font:24px sans-serif">Before</text><svg x="0" y="60" width="500" height="400" viewBox="0 0 500 400" overflow="hidden"><rect style="opacity:1.0;fill:#FFFFFF;stroke:none" width="500.0" height="400.0" x="0.0" y="0.0"> </rect>
+<path class="bond-0 atom-0 atom-1" d="M 223.8,122.0 L 320.7,41.6" style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" />
+<path class="bond-1 atom-1 atom-2" d="M 320.7,41.6 L 164.7,195.9" style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" />
+<path class="bond-2 atom-2 atom-3" d="M 164.7,195.9 L 319.0,351.9" style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" />
+<path class="bond-3 atom-3 atom-4" d="M 319.0,351.9 L 475.0,197.6" style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" />
+<path class="bond-4 atom-4 atom-5" d="M 475.0,197.6 L 335.3,204.1" style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" />
+<path class="bond-5 atom-5 atom-6" d="M 335.3,204.1 L 181.0,48.1" style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" />
+<path class="bond-6 atom-6 atom-7" d="M 181.0,48.1 L 25.0,202.4" style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" />
+<path class="bond-7 atom-7 atom-8" d="M 25.0,202.4 L 179.3,358.4" style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" />
+<path class="bond-8 atom-4 atom-1" d="M 475.0,197.6 L 320.7,41.6" style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" />
+<path class="bond-9 atom-6 atom-1" d="M 181.0,48.1 L 320.7,41.6" style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" />
+<path class="bond-10 atom-7 atom-2" d="M 25.0,202.4 L 164.7,195.9" style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" />
+<path class="bond-11 atom-8 atom-3" d="M 179.3,358.4 L 319.0,351.9" style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" />
+<path class="bond-12 atom-8 atom-5" d="M 179.3,358.4 L 335.3,204.1" style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" />
+</svg><text x="530" y="30" style="font:24px sans-serif">After</text><svg x="510" y="60" width="500" height="400" viewBox="0 0 500 400" overflow="hidden"><rect style="opacity:1.0;fill:#FFFFFF;stroke:none" width="500.0" height="400.0" x="0.0" y="0.0"> </rect>
+<path class="bond-0 atom-0 atom-1" d="M 475.0,158.8 L 301.3,185.5" style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" />
+<path class="bond-1 atom-1 atom-2" d="M 301.3,185.5 L 131.8,139.3" style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" />
+<path class="bond-2 atom-2 atom-3" d="M 131.8,139.3 L 85.6,308.8" style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" />
+<path class="bond-3 atom-3 atom-4" d="M 85.6,308.8 L 255.1,355.0" style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" />
+<path class="bond-4 atom-4 atom-5" d="M 255.1,355.0 L 194.5,260.7" style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" />
+<path class="bond-5 atom-5 atom-6" d="M 194.5,260.7 L 240.8,91.2" style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" />
+<path class="bond-6 atom-6 atom-7" d="M 240.8,91.2 L 71.2,45.0" style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" />
+<path class="bond-7 atom-7 atom-8" d="M 71.2,45.0 L 25.0,214.5" style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" />
+<path class="bond-8 atom-4 atom-1" d="M 255.1,355.0 L 301.3,185.5" style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" />
+<path class="bond-9 atom-6 atom-1" d="M 240.8,91.2 L 301.3,185.5" style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" />
+<path class="bond-10 atom-7 atom-2" d="M 71.2,45.0 L 131.8,139.3" style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" />
+<path class="bond-11 atom-8 atom-3" d="M 25.0,214.5 L 85.6,308.8" style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" />
+<path class="bond-12 atom-8 atom-5" d="M 25.0,214.5 L 194.5,260.7" style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:2.0px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" />
+</svg></svg>
