@@ -37,7 +37,7 @@ molSize = (450, 150)
 highlightSubstructs = True  # highlight substructure matches when drawing 2D structures
 kekulizeStructures = True  # try to kekulize structures before drawing
 highlightByReactant = False  # highlight reactions by reactant
-ipython_useSVG = False  # use the SVG renderer for 2D depictions (otherwise PNG is used)
+ipython_useSVG = not hasattr(rdMolDraw2D, 'MolDraw2DCairo')  # use SVG if Cairo isn't available
 ipython_showProperties = True  # display molecule properties when rendering them in 2D
 ipython_maxProperties = 10  # maximum number of properties to display
 ipython_3d = False  # try to use 3D rendering for molecules with a 3D conformer
@@ -204,6 +204,25 @@ def _wrapHTMLIntoTable(html):
     '</td></tr></tbody></table></div>')
 
 
+def _hasCairoRenderer():
+  return hasattr(rdMolDraw2D, 'MolDraw2DCairo')
+
+
+def _useSVG():
+  # Cairo-less builds must keep working even if a user sets ipython_useSVG=False.
+  return ipython_useSVG or not _hasCairoRenderer()
+
+
+def _getUseSVG(kwargs):
+  if 'useSVG' not in kwargs:
+    return _useSVG()
+  if not kwargs['useSVG'] and not _hasCairoRenderer():
+    warnings.warn('PNG rendering requires Cairo support; falling back to SVG.', RuntimeWarning,
+                  stacklevel=3)
+    return True
+  return kwargs['useSVG']
+
+
 def _toHTML(mol):
   useInteractiveRenderer = InteractiveRenderer.isEnabled(mol)
   if _canUse3D and ipython_3d and mol.GetNumConformers() and mol.GetConformer().Is3D():
@@ -212,7 +231,7 @@ def _toHTML(mol):
   if not ipython_showProperties or not props:
     if useInteractiveRenderer:
       return _wrapHTMLIntoTable(
-        InteractiveRenderer.generateHTMLBody(mol, molSize, useSVG=ipython_useSVG))
+        InteractiveRenderer.generateHTMLBody(mol, molSize, useSVG=_useSVG()))
     else:
       return _toSVG(mol)
   if mol.HasProp('_Name'):
@@ -223,9 +242,9 @@ def _toHTML(mol):
   res = []
 
   if useInteractiveRenderer:
-    content = InteractiveRenderer.generateHTMLBody(mol, molSize, legend=nm, useSVG=ipython_useSVG)
+    content = InteractiveRenderer.generateHTMLBody(mol, molSize, legend=nm, useSVG=_useSVG())
   else:
-    if not ipython_useSVG:
+    if not _useSVG():
       png = _toPNG(mol)
       png = base64.b64encode(png)
       content = f'<image src="data:image/png;base64,{png.decode()}">'
@@ -258,7 +277,7 @@ def listToLists(lst):
 
 
 def _toPNG(mol):
-  if ipython_useSVG or not hasattr(rdMolDraw2D, 'MolDraw2DCairo'):
+  if _useSVG():
     return None
   if hasattr(mol, '__sssAtoms'):
     highlightAtoms = listToLists(mol.__sssAtoms)
@@ -273,7 +292,7 @@ def _toPNG(mol):
 
 
 def _toSVG(mol):
-  if not ipython_useSVG:
+  if not _useSVG():
     return None
   if hasattr(mol, '__sssAtoms'):
     highlightAtoms = listToLists(mol.__sssAtoms)
@@ -287,7 +306,7 @@ def _toSVG(mol):
 
 
 def _toReactionPNG(rxn):
-  if ipython_useSVG or not hasattr(rdMolDraw2D, 'MolDraw2DCairo'):
+  if _useSVG():
     return None
   rc = copy.deepcopy(rxn)
   return Draw.ReactionToImage(rc, subImgSize=(int(molSize[0] / 3), molSize[1]),
@@ -296,7 +315,7 @@ def _toReactionPNG(rxn):
 
 
 def _toReactionSVG(rxn):
-  if not ipython_useSVG:
+  if not _useSVG():
     return None
   rc = copy.deepcopy(rxn)
   return Draw.ReactionToImage(rc, subImgSize=(int(molSize[0] / 3), molSize[1]), useSVG=True,
@@ -304,7 +323,7 @@ def _toReactionSVG(rxn):
 
 
 def _toMolBundlePNG(bundle):
-  if ipython_useSVG or not hasattr(rdMolDraw2D, 'MolDraw2DCairo'):
+  if _useSVG():
     return None
   if Draw._MolsToGridImageSaved is not None:
     fn = Draw._MolsToGridImageSaved
@@ -314,7 +333,7 @@ def _toMolBundlePNG(bundle):
 
 
 def _toMolBundleSVG(bundle):
-  if not ipython_useSVG:
+  if not _useSVG():
     return None
   if Draw._MolsToGridImageSaved is not None:
     fn = Draw._MolsToGridImageSaved
@@ -367,8 +386,7 @@ from IPython import display
 
 
 def ShowMols(mols, maxMols=50, **kwargs):
-  if 'useSVG' not in kwargs:
-    kwargs['useSVG'] = ipython_useSVG
+  kwargs['useSVG'] = _getUseSVG(kwargs)
   if 'returnPNG' not in kwargs:
     kwargs['returnPNG'] = True
   if InteractiveRenderer.isEnabled():
@@ -400,8 +418,7 @@ def ShowMols(mols, maxMols=50, **kwargs):
 
 
 def _DrawBit(fn, *args, **kwargs):
-  if 'useSVG' not in kwargs:
-    kwargs['useSVG'] = ipython_useSVG
+  kwargs['useSVG'] = _getUseSVG(kwargs)
 
   res = fn(*args, **kwargs)
   if kwargs['useSVG']:
@@ -411,8 +428,7 @@ def _DrawBit(fn, *args, **kwargs):
 
 
 def _DrawBits(fn, *args, **kwargs):
-  if 'useSVG' not in kwargs:
-    kwargs['useSVG'] = ipython_useSVG
+  kwargs['useSVG'] = _getUseSVG(kwargs)
 
   res = fn(*args, **kwargs)
   if kwargs['useSVG']:
