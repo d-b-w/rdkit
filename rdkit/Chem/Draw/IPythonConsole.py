@@ -217,8 +217,6 @@ def _getUseSVG(kwargs):
   if 'useSVG' not in kwargs:
     return _useSVG()
   if not kwargs['useSVG'] and not _hasCairoRenderer():
-    warnings.warn('PNG rendering requires Cairo support; falling back to SVG.', RuntimeWarning,
-                  stacklevel=3)
     return True
   return kwargs['useSVG']
 

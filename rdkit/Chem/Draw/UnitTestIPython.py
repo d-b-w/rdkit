@@ -129,7 +129,7 @@ class TestCase(unittest.TestCase):
       IPythonConsole.ipython_showProperties = old_show_properties
 
   @unittest.skipIf(IPythonConsole is None, 'IPython not available')
-  def testExplicitPNGWithoutCairoWarnsAndFallsBackToSVG(self):
+  def testExplicitPNGWithoutCairoFallsBackToSVGQuietly(self):
     bitInfo = {}
     Chem.RDKFingerprint(self.mol, bitInfo=bitInfo)
     bitId = next(iter(bitInfo))
@@ -141,11 +141,9 @@ class TestCase(unittest.TestCase):
     with mock.patch.object(IPythonConsole, '_hasCairoRenderer', return_value=False):
       for fn, args in drawingCalls:
         with self.subTest(function=fn.__name__):
-          with self.assertWarnsRegex(RuntimeWarning, 'PNG rendering requires Cairo support'):
-            result = fn(*args, useSVG=False)
-          self.assertIsInstance(result, SVG)
           with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter('always')
+            self.assertIsInstance(fn(*args, useSVG=False), SVG)
             self.assertIsInstance(fn(*args), SVG)
             self.assertIsInstance(fn(*args, useSVG=True), SVG)
           self.assertEqual(caught, [])
