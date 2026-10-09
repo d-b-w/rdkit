@@ -119,7 +119,8 @@ class TestCase(unittest.TestCase):
       self.mol.SetProp('publicprop', 'ppropval')
       with mock.patch.object(IPythonConsole, '_hasCairoRenderer', return_value=False):
         self.assertTrue(IPythonConsole._useSVG())
-        self.assertIsNone(IPythonConsole._toPNG(self.mol))
+        with mock.patch.object(IPythonConsole.Draw, '_moltoimg', return_value=b'png'):
+          self.assertEqual(IPythonConsole._toPNG(self.mol), b'png')
         self.assertIsNotNone(IPythonConsole._toSVG(self.mol))
         html = IPythonConsole._toHTML(self.mol)
       self.assertIn('<svg', html)
@@ -149,9 +150,9 @@ class TestCase(unittest.TestCase):
           self.assertEqual(caught, [])
       with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter('always')
-        self.assertIsNone(IPythonConsole._toPNG(self.mol))
-        self.assertIsNone(IPythonConsole._toReactionPNG(None))
-        self.assertIsNone(IPythonConsole._toMolBundlePNG(None))
+        self.assertIsNone(IPythonConsole._toPNGRepr(self.mol))
+        self.assertIsNone(IPythonConsole._toReactionPNGRepr(None))
+        self.assertIsNone(IPythonConsole._toMolBundlePNGRepr(None))
       self.assertEqual(caught, [])
 
   @unittest.skipIf(IPythonConsole is None, 'IPython not available')

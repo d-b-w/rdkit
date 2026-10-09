@@ -275,8 +275,6 @@ def listToLists(lst):
 
 
 def _toPNG(mol):
-  if _useSVG():
-    return None
   if hasattr(mol, '__sssAtoms'):
     highlightAtoms = listToLists(mol.__sssAtoms)
     return Draw.DrawMolWithMatches(mol, highlightAtoms, molSize=molSize,
@@ -287,6 +285,12 @@ def _toPNG(mol):
   kekulize = kekulizeStructures
   return Draw._moltoimg(mol, molSize, highlightAtoms, "", returnPNG=True, kekulize=kekulize,
                         drawOptions=drawOptions)
+
+
+def _toPNGRepr(mol):
+  if _useSVG():
+    return None
+  return _toPNG(mol)
 
 
 def _toSVG(mol):
@@ -304,12 +308,16 @@ def _toSVG(mol):
 
 
 def _toReactionPNG(rxn):
-  if _useSVG():
-    return None
   rc = copy.deepcopy(rxn)
   return Draw.ReactionToImage(rc, subImgSize=(int(molSize[0] / 3), molSize[1]),
                               highlightByReactant=highlightByReactant, drawOptions=drawOptions,
                               returnPNG=True)
+
+
+def _toReactionPNGRepr(rxn):
+  if _useSVG():
+    return None
+  return _toReactionPNG(rxn)
 
 
 def _toReactionSVG(rxn):
@@ -321,13 +329,17 @@ def _toReactionSVG(rxn):
 
 
 def _toMolBundlePNG(bundle):
-  if _useSVG():
-    return None
   if Draw._MolsToGridImageSaved is not None:
     fn = Draw._MolsToGridImageSaved
   else:
     fn = Draw.MolsToGridImage
   return fn(bundle, subImgSize=molSize, drawOptions=drawOptions, useSVG=False, returnPNG=True)
+
+
+def _toMolBundlePNGRepr(bundle):
+  if _useSVG():
+    return None
+  return _toMolBundlePNG(bundle)
 
 
 def _toMolBundleSVG(bundle):
@@ -490,19 +502,19 @@ def InstallIPythonRenderer():
   # Github #8082
   UninstallIPythonRenderer()
 
-  rdchem.Mol._repr_png_ = _toPNG
+  rdchem.Mol._repr_png_ = _toPNGRepr
   rdchem.Mol._repr_svg_ = _toSVG
   _methodsToDelete.append((rdchem.Mol, '_repr_png_'))
   _methodsToDelete.append((rdchem.Mol, '_repr_svg_'))
   rdchem.Mol._repr_html_ = _toHTML
   _methodsToDelete.append((rdchem.Mol, '_repr_html_'))
 
-  rdChemReactions.ChemicalReaction._repr_png_ = _toReactionPNG
+  rdChemReactions.ChemicalReaction._repr_png_ = _toReactionPNGRepr
   rdChemReactions.ChemicalReaction._repr_svg_ = _toReactionSVG
   _methodsToDelete.append((rdChemReactions.ChemicalReaction, '_repr_png_'))
   _methodsToDelete.append((rdChemReactions.ChemicalReaction, '_repr_svg_'))
 
-  rdchem.MolBundle._repr_png_ = _toMolBundlePNG
+  rdchem.MolBundle._repr_png_ = _toMolBundlePNGRepr
   rdchem.MolBundle._repr_svg_ = _toMolBundleSVG
   _methodsToDelete.append((rdchem.MolBundle, '_repr_png_'))
   _methodsToDelete.append((rdchem.MolBundle, '_repr_svg_'))
